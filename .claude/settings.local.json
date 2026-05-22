@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Test-Path C:\\\\Users\\\\juanj\\\\OneDrive\\\\Escritorio\\\\deone-cliente\\\\node_modules\\\\react-native-google-places-autocomplete *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\juanj\\\\OneDrive\\\\Escritorio\\\\deone-cliente\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)"
+    ]
+  }
+}

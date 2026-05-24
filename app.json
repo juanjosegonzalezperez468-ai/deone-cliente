@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "usesCleartextTraffic": true,
-      "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "$GOOGLE_SERVICES_JSON",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"

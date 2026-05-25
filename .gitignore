@@ -35,8 +35,6 @@ yarn-error.*
 .env
 
 # Secrets & credentials
-google-services.json
-google-services*.json
 credentials.json
 *.keystore
 

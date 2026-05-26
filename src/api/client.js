@@ -1,4 +1,5 @@
 import axios from 'axios';
+import auth from '@react-native-firebase/auth';
 import { API_URL } from '../constants/config';
 
 const api = axios.create({
@@ -7,6 +8,15 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+api.interceptors.request.use(async (config) => {
+  const user = auth().currentUser;
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export const authApi = {

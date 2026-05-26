@@ -49,6 +49,7 @@ export default function RequestScreen({ params, navigate, goBack }) {
       const uid = auth().currentUser?.uid;
       if (!uid) {
         Alert.alert('Error', 'Debes iniciar sesión para solicitar un servicio.');
+        setLoading(false);
         return;
       }
       const body = {
@@ -76,7 +77,10 @@ export default function RequestScreen({ params, navigate, goBack }) {
       });
     } catch (err) {
       console.log('Error completo:', JSON.stringify(err));
-      const msg = err.response?.data?.detail || 'No se pudo conectar al servidor. Verifica tu conexión.';
+      const msg = err.response?.data?.detail
+        || err.response?.data?.message
+        || err.message
+        || 'No se pudo conectar al servidor. Verifica tu conexión.';
       Alert.alert('Error', msg);
     } finally {
       setLoading(false);

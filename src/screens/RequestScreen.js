@@ -4,8 +4,9 @@ import {
   StyleSheet, StatusBar, TextInput, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SERVICES } from '../constants/services';
-import { CLIENTE_ID, API_URL } from '../constants/config';
+import { API_URL } from '../constants/config';
 import { servicesApi } from '../api/client';
+import auth from '@react-native-firebase/auth';
 
 const C = {
   white: '#FFFFFF',
@@ -45,8 +46,13 @@ export default function RequestScreen({ params, navigate, goBack }) {
     setLoading(true);
     try {
       const precioPropuesto = negotiable ? parseInt(price, 10) : fareInfo.adjusted;
+      const uid = auth().currentUser?.uid;
+      if (!uid) {
+        Alert.alert('Error', 'Debes iniciar sesión para solicitar un servicio.');
+        return;
+      }
       const body = {
-        cliente_id:        CLIENTE_ID,
+        cliente_id:        uid,
         tipo_servicio:     serviceId,
         precio_propuesto:  precioPropuesto,
         origen_lat:        origin.lat,

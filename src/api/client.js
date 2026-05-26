@@ -13,8 +13,8 @@ export const authApi = {
   enviarOtp: (telefono) => api.post('/auth/enviar-otp', { telefono }),
   verificarOtp: (telefono, codigo) =>
     api.post('/auth/verificar-otp', { telefono, codigo }),
-  registrar: (telefono, tipo, nombre) =>
-    api.post('/auth/verificar-otp', { telefono, tipo, nombre }),
+  registrar: (telefono, tipo, nombre, idToken) =>
+    api.post('/auth/verificar-otp', { telefono, token: idToken, tipo, nombre }),
 };
 
 export const servicesApi = {

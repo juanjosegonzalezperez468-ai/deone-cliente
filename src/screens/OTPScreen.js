@@ -56,8 +56,9 @@ export default function OTPScreen({ params, navigate }) {
     setLoading(true);
     try {
       const result = await params.confirmation.confirm(code);
+      const idToken = await result.user.getIdToken();
       if (result.additionalUserInfo?.isNewUser) {
-        navigate('Registro', { telefono: params.telefono });
+        navigate('Registro', { telefono: params.telefono, idToken });
       } else {
         navigate('Home');
       }

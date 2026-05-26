@@ -18,7 +18,7 @@ export default function RegistroScreen({ params, navigate }) {
     }
     setLoading(true);
     try {
-      await authApi.registrar(params.telefono, tipo, nombre.trim());
+      await authApi.registrar(params.telefono, tipo, nombre.trim(), params.idToken);
       navigate('Home');
     } catch (err) {
       Alert.alert('Error', err.message || 'No se pudo crear la cuenta. Intenta de nuevo.');

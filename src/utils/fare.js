@@ -10,10 +10,17 @@ export const FARE_RULES = {
 
 export const isNegotiable = (id) => FARE_RULES[id] === null;
 
+export const isNocturno = () => {
+  // Colombia UTC-5: nocturno entre 10pm (22h) y 5am
+  const colombiaHour = (new Date().getUTCHours() - 5 + 24) % 24;
+  return colombiaHour >= 22 || colombiaHour < 5;
+};
+
 export const calcFare = (km, minutes, serviceId) => {
   const r = FARE_RULES[serviceId];
   if (!r) return null;
-  return Math.max(r.min, km * r.perKm + minutes * r.perMin);
+  const base = Math.max(r.min, km * r.perKm + minutes * r.perMin);
+  return isNocturno() ? Math.round(base * 1.2) : base;
 };
 
 export const getDirections = async (oLat, oLng, dLat, dLng) => {

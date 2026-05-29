@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, StatusBar, ActivityIndicator, Image,
@@ -35,7 +35,19 @@ export default function OfertasScreen({ params, navigate, goBack }) {
     destDir         = '',
   } = params;
 
+  const [ofertasList, setOfertasList] = useState(ofertas);
   const [loadingId, setLoadingId] = useState(null);
+
+  useEffect(() => {
+    if (!serviceDbId) return;
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await offersApi.porSolicitud(serviceDbId);
+        if (Array.isArray(data) && data.length > 0) setOfertasList(data);
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [serviceDbId]);
 
   const handleAceptar = async (oferta) => {
     if (loadingId) return;
@@ -77,7 +89,7 @@ export default function OfertasScreen({ params, navigate, goBack }) {
       <View style={s.titlesWrap}>
         <Text style={s.title}>Conductores disponibles</Text>
         <Text style={s.subtitle}>
-          {ofertas.length} conductor{ofertas.length !== 1 ? 'es' : ''} respondieron
+          {ofertasList.length} conductor{ofertasList.length !== 1 ? 'es' : ''} respondieron
         </Text>
       </View>
 
@@ -86,7 +98,7 @@ export default function OfertasScreen({ params, navigate, goBack }) {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
-        {ofertas.map((oferta) => {
+        {ofertasList.map((oferta) => {
           const nombre    = oferta.conductor_nombre    || 'Conductor';
           const rating    = oferta.conductor_rating    || 4.8;
           const vehiculo  = oferta.conductor_vehiculo  || 'Moto';
@@ -139,7 +151,7 @@ export default function OfertasScreen({ params, navigate, goBack }) {
           );
         })}
 
-        {ofertas.length === 0 && (
+        {ofertasList.length === 0 && (
           <View style={s.emptyWrap}>
             <Text style={s.emptyIcon}>🏍️</Text>
             <Text style={s.emptyTxt}>Sin ofertas por ahora</Text>

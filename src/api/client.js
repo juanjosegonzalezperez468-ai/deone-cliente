@@ -28,8 +28,9 @@ export const authApi = {
 };
 
 export const servicesApi = {
-  crear: (data) => api.post('/services/crear', data),
+  crear:   (data)      => api.post('/services/crear', data),
   ofertas: (serviceId) => api.get(`/services/${serviceId}/ofertas`),
+  obtener: (serviceId) => api.get(`/services/${serviceId}`),
 };
 
 export const offersApi = {

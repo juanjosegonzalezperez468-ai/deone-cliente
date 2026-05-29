@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Share, Image,
+  StatusBar, Share, Alert, Linking, Image,
 } from 'react-native';
+import { servicesApi } from '../api/client';
 
 const C = {
   bg:     '#F8F8F8',
@@ -22,7 +23,9 @@ const SHADOW = {
   elevation:     4,
 };
 
-export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
+const ESTADOS_FINALIZADO = ['finalizado', 'completado', 'terminado', 'finished'];
+
+export default function ViajeEnCursoScreen({ params, navigate }) {
   const {
     conductorNombre   = 'Conductor',
     conductorVehiculo = 'Moto',
@@ -34,59 +37,83 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
 
   const inicial = conductorNombre.charAt(0).toUpperCase();
 
-  const handleCompartir = async () => {
-    try {
-      await Share.share({
-        message: `Estoy viajando con DEONE. Conductor: ${conductorNombre} · ${conductorVehiculo}\nDestino: ${destDir}`,
-      });
-    } catch {}
+  useEffect(() => {
+    if (!serviceDbId) return;
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await servicesApi.obtener(serviceDbId);
+        if (ESTADOS_FINALIZADO.includes(data?.estado)) {
+          clearInterval(interval);
+          navigate('ServicioFinalizado', {
+            serviceDbId,
+            conductorId,
+            precioFinal:    precioAceptado,
+            conductorNombre,
+          });
+        }
+      } catch {}
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [serviceDbId]);
+
+  const handleSOS = () => {
+    Alert.alert(
+      '¿Necesitas ayuda?',
+      '',
+      [
+        { text: 'Llamar 123', onPress: () => Linking.openURL('tel:123').catch(() => {}) },
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
   };
 
-  const handleFinalizar = () => {
-    navigate('ServicioFinalizado', {
-      serviceDbId,
-      conductorId,
-      precioFinal:     precioAceptado,
-      conductorNombre,
-    });
+  const handleCompartir = async () => {
+    const msg = `Estoy viajando con DEONE 🛵\nConductor: ${conductorNombre} · ${conductorVehiculo}\nDestino: ${destDir}`;
+    const url = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+    const canOpen = await Linking.canOpenURL(url).catch(() => false);
+    if (canOpen) {
+      Linking.openURL(url).catch(() => {});
+    } else {
+      Share.share({ message: msg }).catch(() => {});
+    }
   };
 
   return (
     <View style={s.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
-      {/* Badge estado (flotante) */}
+      {/* Badge EN VIAJE flotante */}
       <View style={s.statusBadge}>
         <View style={s.statusDot} />
         <Text style={s.statusTxt}>EN VIAJE</Text>
       </View>
 
+      {/* Botón SOS flotante */}
+      <TouchableOpacity style={s.sosBtn} onPress={handleSOS} activeOpacity={0.8}>
+        <Text style={s.sosTxt}>SOS</Text>
+      </TouchableOpacity>
+
       {/* Mapa */}
       <View style={s.mapArea}>
-        {/* Grid */}
         <View style={s.mH1} /><View style={s.mH2} />
         <View style={s.mV1} /><View style={s.mV2} />
         <View style={s.street1} /><View style={s.street2} />
 
-        {/* Ruta en curso */}
         <View style={s.routeLineDone} />
         <View style={s.routeLineAhead} />
 
-        {/* Conductor (en movimiento) */}
         <View style={s.carPin}>
           <View style={s.carCircle}>
             <Text style={s.carEmoji}>🏍️</Text>
           </View>
         </View>
 
-        {/* Destino */}
         <View style={s.destPin}>
           <View style={s.destCircle}>
             <Text style={s.destEmoji}>📍</Text>
           </View>
         </View>
 
-        {/* Destino label */}
         <View style={s.destBadge}>
           <Text style={s.destBadgeTxt} numberOfLines={1}>{destDir}</Text>
         </View>
@@ -95,7 +122,6 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
       {/* Card flotante abajo */}
       <View style={s.bottomSheet}>
 
-        {/* Info compacta */}
         <View style={s.infoCard}>
           <View style={s.conductorRow}>
             <View style={s.avatar}>
@@ -119,13 +145,8 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
           </View>
         </View>
 
-        {/* Botones */}
         <TouchableOpacity style={s.btnCompartir} onPress={handleCompartir} activeOpacity={0.85}>
           <Text style={s.btnCompartirTxt}>COMPARTIR VIAJE</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={s.btnCancelar} onPress={handleFinalizar} activeOpacity={0.85}>
-          <Text style={s.btnCancelarTxt}>FINALIZAR VIAJE</Text>
         </TouchableOpacity>
 
       </View>
@@ -138,16 +159,16 @@ const s = StyleSheet.create({
 
   /* Status badge */
   statusBadge: {
-    position:        'absolute',
-    top:             56,
-    left:            16,
-    zIndex:          10,
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: C.white,
-    borderRadius:    14,
+    position:          'absolute',
+    top:               56,
+    left:              16,
+    zIndex:            10,
+    flexDirection:     'row',
+    alignItems:        'center',
+    backgroundColor:   C.white,
+    borderRadius:      14,
     paddingHorizontal: 12,
-    paddingVertical:  7,
+    paddingVertical:   7,
     ...SHADOW,
   },
   statusDot: {
@@ -158,6 +179,20 @@ const s = StyleSheet.create({
     marginRight:     7,
   },
   statusTxt: { color: C.black, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+
+  /* SOS button */
+  sosBtn: {
+    position:          'absolute',
+    top:               56,
+    right:             16,
+    zIndex:            10,
+    backgroundColor:   C.red,
+    borderRadius:      14,
+    paddingHorizontal: 12,
+    paddingVertical:   7,
+    ...SHADOW,
+  },
+  sosTxt: { color: C.white, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
 
   /* Mapa */
   mapArea: {
@@ -207,8 +242,8 @@ const s = StyleSheet.create({
     shadowRadius:    6,
     elevation:       5,
   },
-  carEmoji:    { fontSize: 22 },
-  destPin:     { position: 'absolute', top: '64%', left: '40%' },
+  carEmoji:   { fontSize: 22 },
+  destPin:    { position: 'absolute', top: '64%', left: '40%' },
   destCircle: {
     width:           38,
     height:          38,
@@ -219,14 +254,14 @@ const s = StyleSheet.create({
   },
   destEmoji: { fontSize: 18 },
   destBadge: {
-    position:        'absolute',
-    bottom:          12,
-    left:            12,
-    right:           12,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius:    12,
+    position:          'absolute',
+    bottom:            12,
+    left:              12,
+    right:             12,
+    backgroundColor:   'rgba(255,255,255,0.9)',
+    borderRadius:      12,
     paddingHorizontal: 12,
-    paddingVertical:  6,
+    paddingVertical:   6,
   },
   destBadgeTxt: { color: C.black, fontSize: 12, fontWeight: '500', textAlign: 'center' },
 
@@ -246,7 +281,7 @@ const s = StyleSheet.create({
     marginBottom:    12,
     ...SHADOW,
   },
-  conductorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  conductorRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   avatar: {
     width:           44,
     height:          44,
@@ -256,19 +291,19 @@ const s = StyleSheet.create({
     justifyContent:  'center',
     marginRight:     10,
   },
-  avatarTxt:       { color: C.black, fontSize: 18, fontWeight: '800' },
-  conductorInfo:   { flex: 1 },
-  conductorNombre: { color: C.black, fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  avatarTxt:         { color: C.black, fontSize: 18, fontWeight: '800' },
+  conductorInfo:     { flex: 1 },
+  conductorNombre:   { color: C.black, fontSize: 15, fontWeight: '700', marginBottom: 2 },
   conductorVehiculo: { color: C.gray, fontSize: 12 },
-  infoRight:       { alignItems: 'flex-end' },
-  precioVal:       { color: C.black, fontSize: 18, fontWeight: '800' },
-  precioLbl:       { color: C.gray, fontSize: 10 },
+  infoRight:         { alignItems: 'flex-end' },
+  precioVal:         { color: C.black, fontSize: 18, fontWeight: '800' },
+  precioLbl:         { color: C.gray, fontSize: 10 },
   destRow: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    paddingTop:      10,
-    borderTopWidth:  1,
-    borderTopColor:  C.border,
+    flexDirection:  'row',
+    alignItems:     'center',
+    paddingTop:     10,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
   },
   destDot: {
     width:           8,
@@ -284,16 +319,6 @@ const s = StyleSheet.create({
     borderRadius:    18,
     paddingVertical: 16,
     alignItems:      'center',
-    marginBottom:    10,
   },
   btnCompartirTxt: { color: C.black, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
-
-  btnCancelar: {
-    borderRadius:    18,
-    paddingVertical: 16,
-    alignItems:      'center',
-    borderWidth:     1.5,
-    borderColor:     C.red,
-  },
-  btnCancelarTxt: { color: C.red, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

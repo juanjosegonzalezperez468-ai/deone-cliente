@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Share, Alert, Linking, Image,
 } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { servicesApi } from '../api/client';
 
 const C = {
@@ -33,10 +35,38 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
     destDir           = 'Destino',
     serviceDbId       = '',
     conductorId       = '',
+    destLat           = 0,
+    destLng           = 0,
   } = params;
 
-  const inicial = conductorNombre.charAt(0).toUpperCase();
+  const [clientPos, setClientPos] = useState(null);
+  const mapRef                    = useRef(null);
+  const inicial                   = conductorNombre.charAt(0).toUpperCase();
 
+  // Obtain GPS position once
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const pos = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setClientPos(pos);
+
+      if (destLat && destLng) {
+        mapRef.current?.fitToCoordinates(
+          [pos, { latitude: destLat, longitude: destLng }],
+          { edgePadding: { top: 120, right: 60, bottom: 280, left: 60 }, animated: true },
+        );
+      } else {
+        mapRef.current?.animateToRegion(
+          { ...pos, latitudeDelta: 0.05, longitudeDelta: 0.05 },
+          500,
+        );
+      }
+    })();
+  }, []);
+
+  // Poll trip state every 10s
   useEffect(() => {
     if (!serviceDbId) return;
     const interval = setInterval(async () => {
@@ -78,9 +108,54 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
     }
   };
 
+  const hasDestination = !!destLat && !!destLng;
+
   return (
     <View style={s.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+
+      {/* Mapa pantalla completa */}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={StyleSheet.absoluteFill}
+        initialRegion={{
+          latitude:       destLat || 4.6097,
+          longitude:      destLng || -74.0817,
+          latitudeDelta:  0.06,
+          longitudeDelta: 0.06,
+        }}
+      >
+        {clientPos && (
+          <Marker coordinate={clientPos} anchor={{ x: 0.5, y: 0.5 }}>
+            <View style={s.clientMarker}>
+              <Text style={s.markerEmoji}>📍</Text>
+            </View>
+          </Marker>
+        )}
+
+        {hasDestination && (
+          <Marker
+            coordinate={{ latitude: destLat, longitude: destLng }}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <View style={s.destMarker}>
+              <Text style={s.markerEmoji}>🏁</Text>
+            </View>
+          </Marker>
+        )}
+
+        {clientPos && hasDestination && (
+          <Polyline
+            coordinates={[
+              clientPos,
+              { latitude: destLat, longitude: destLng },
+            ]}
+            strokeColor={C.yellow}
+            strokeWidth={4}
+          />
+        )}
+      </MapView>
 
       {/* Badge EN VIAJE flotante */}
       <View style={s.statusBadge}>
@@ -92,32 +167,6 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
       <TouchableOpacity style={s.sosBtn} onPress={handleSOS} activeOpacity={0.8}>
         <Text style={s.sosTxt}>SOS</Text>
       </TouchableOpacity>
-
-      {/* Mapa */}
-      <View style={s.mapArea}>
-        <View style={s.mH1} /><View style={s.mH2} />
-        <View style={s.mV1} /><View style={s.mV2} />
-        <View style={s.street1} /><View style={s.street2} />
-
-        <View style={s.routeLineDone} />
-        <View style={s.routeLineAhead} />
-
-        <View style={s.carPin}>
-          <View style={s.carCircle}>
-            <Text style={s.carEmoji}>🏍️</Text>
-          </View>
-        </View>
-
-        <View style={s.destPin}>
-          <View style={s.destCircle}>
-            <Text style={s.destEmoji}>📍</Text>
-          </View>
-        </View>
-
-        <View style={s.destBadge}>
-          <Text style={s.destBadgeTxt} numberOfLines={1}>{destDir}</Text>
-        </View>
-      </View>
 
       {/* Card flotante abajo */}
       <View style={s.bottomSheet}>
@@ -157,6 +206,31 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
 
+  /* Markers */
+  clientMarker: {
+    width:           38,
+    height:          38,
+    borderRadius:    19,
+    backgroundColor: '#FFFFFF',
+    alignItems:      'center',
+    justifyContent:  'center',
+    elevation:       4,
+    shadowColor:     '#000',
+    shadowOffset:    { width: 0, height: 2 },
+    shadowOpacity:   0.2,
+    shadowRadius:    4,
+  },
+  destMarker: {
+    width:           44,
+    height:          44,
+    borderRadius:    22,
+    backgroundColor: '#111111',
+    alignItems:      'center',
+    justifyContent:  'center',
+    elevation:       5,
+  },
+  markerEmoji: { fontSize: 20 },
+
   /* Status badge */
   statusBadge: {
     position:          'absolute',
@@ -194,79 +268,12 @@ const s = StyleSheet.create({
   },
   sosTxt: { color: C.white, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
 
-  /* Mapa */
-  mapArea: {
-    flex:            1,
-    backgroundColor: '#E4EDE4',
-    position:        'relative',
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  mH1:     { position: 'absolute', left: 0, right: 0, top: '33%', height: 1, backgroundColor: '#D2DDD2' },
-  mH2:     { position: 'absolute', left: 0, right: 0, top: '66%', height: 1, backgroundColor: '#D2DDD2' },
-  mV1:     { position: 'absolute', top: 0, bottom: 0, left: '33%', width: 1, backgroundColor: '#D2DDD2' },
-  mV2:     { position: 'absolute', top: 0, bottom: 0, left: '66%', width: 1, backgroundColor: '#D2DDD2' },
-  street1: { position: 'absolute', top: '45%', left: 0, right: 0, height: 8, backgroundColor: '#C8D5C8', opacity: 0.7 },
-  street2: { position: 'absolute', top: 0, bottom: 0, left: '42%', width: 8, backgroundColor: '#C8D5C8', opacity: 0.7 },
-
-  routeLineDone: {
-    position:        'absolute',
-    width:           3,
-    height:          60,
-    backgroundColor: '#22C55E',
-    top:             '30%',
-    left:            '43%',
-    borderRadius:    2,
-  },
-  routeLineAhead: {
-    position:        'absolute',
-    width:           3,
-    height:          80,
-    backgroundColor: C.yellow,
-    top:             '48%',
-    left:            '43%',
-    borderRadius:    2,
-    opacity:         0.7,
-  },
-  carPin: { position: 'absolute', top: '26%', left: '40%' },
-  carCircle: {
-    width:           44,
-    height:          44,
-    borderRadius:    22,
-    backgroundColor: C.yellow,
-    alignItems:      'center',
-    justifyContent:  'center',
-    shadowColor:     C.yellow,
-    shadowOffset:    { width: 0, height: 3 },
-    shadowOpacity:   0.5,
-    shadowRadius:    6,
-    elevation:       5,
-  },
-  carEmoji:   { fontSize: 22 },
-  destPin:    { position: 'absolute', top: '64%', left: '40%' },
-  destCircle: {
-    width:           38,
-    height:          38,
-    borderRadius:    19,
-    backgroundColor: C.black,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  destEmoji: { fontSize: 18 },
-  destBadge: {
-    position:          'absolute',
-    bottom:            12,
-    left:              12,
-    right:             12,
-    backgroundColor:   'rgba(255,255,255,0.9)',
-    borderRadius:      12,
-    paddingHorizontal: 12,
-    paddingVertical:   6,
-  },
-  destBadgeTxt: { color: C.black, fontSize: 12, fontWeight: '500', textAlign: 'center' },
-
   /* Bottom sheet */
   bottomSheet: {
+    position:             'absolute',
+    bottom:               0,
+    left:                 0,
+    right:                0,
     backgroundColor:      C.bg,
     borderTopLeftRadius:  28,
     borderTopRightRadius: 28,

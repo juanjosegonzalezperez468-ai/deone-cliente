@@ -46,6 +46,8 @@ export const ratingsApi = {
 export const locationsApi = {
   actualizarConductor: (data) =>
     api.post('/locations/conductor/actualizar', data),
+  obtenerConductor: (conductorId) =>
+    api.get(`/locations/conductor/${conductorId}`),
 };
 
 export default api;

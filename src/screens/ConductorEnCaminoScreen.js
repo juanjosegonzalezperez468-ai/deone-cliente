@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Linking, Alert, Image,
 } from 'react-native';
-import { servicesApi } from '../api/client';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { servicesApi, locationsApi } from '../api/client';
 import { isNocturno } from '../utils/fare';
 
 const C = {
@@ -41,12 +42,18 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
     origenDir         = 'Tu ubicación',
     destDir           = 'Destino',
     serviceDbId       = '',
+    conductorId       = '',
+    origenLat         = 4.6097,
+    origenLng         = -74.0817,
   } = params;
 
-  const [eta, setEta] = useState(3);
-  const nocturno = isNocturno();
-  const inicial  = conductorNombre.charAt(0).toUpperCase();
+  const [eta, setEta]               = useState(3);
+  const [conductorPos, setConductorPos] = useState(null);
+  const mapRef                      = useRef(null);
+  const nocturno                    = isNocturno();
+  const inicial                     = conductorNombre.charAt(0).toUpperCase();
 
+  // Poll trip state every 10s
   useEffect(() => {
     if (!serviceDbId) return;
     const interval = setInterval(async () => {
@@ -61,6 +68,29 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
     }, 10000);
     return () => clearInterval(interval);
   }, [serviceDbId]);
+
+  // Poll conductor location every 10s
+  useEffect(() => {
+    if (!conductorId) return;
+
+    const fetchPos = async () => {
+      try {
+        const { data } = await locationsApi.obtenerConductor(conductorId);
+        if (data?.lat && data?.lng) {
+          const pos = { latitude: data.lat, longitude: data.lng };
+          setConductorPos(pos);
+          mapRef.current?.animateToRegion(
+            { ...pos, latitudeDelta: 0.04, longitudeDelta: 0.04 },
+            500,
+          );
+        }
+      } catch {}
+    };
+
+    fetchPos();
+    const interval = setInterval(fetchPos, 10000);
+    return () => clearInterval(interval);
+  }, [conductorId]);
 
   const handleLlamar = () => {
     Linking.openURL('tel:+573009000000').catch(() => {});
@@ -89,23 +119,37 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
         </TouchableOpacity>
       </View>
 
-      {/* Mapa */}
+      {/* Mapa real */}
       <View style={s.mapArea}>
-        <View style={s.mH1} /><View style={s.mH2} />
-        <View style={s.mV1} /><View style={s.mV2} />
-        <View style={s.street1} /><View style={s.street2} />
-
-        <View style={s.routeLine} />
-        <View style={s.conductorPin}>
-          <View style={s.conductorPinCircle}>
-            <Text style={s.conductorPinEmoji}>🏍️</Text>
-          </View>
-        </View>
-        <View style={s.pickupPin}>
-          <View style={s.pickupCircle}>
-            <Text style={s.pickupEmoji}>📍</Text>
-          </View>
-        </View>
+        <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          style={StyleSheet.absoluteFill}
+          initialRegion={{
+            latitude:      origenLat,
+            longitude:     origenLng,
+            latitudeDelta: 0.04,
+            longitudeDelta: 0.04,
+          }}
+        >
+          {conductorPos && (
+            <Marker coordinate={conductorPos} anchor={{ x: 0.5, y: 0.5 }}>
+              <View style={s.conductorMarker}>
+                <Text style={s.markerEmoji}>🏍️</Text>
+              </View>
+            </Marker>
+          )}
+          {!!origenLat && !!origenLng && (
+            <Marker
+              coordinate={{ latitude: origenLat, longitude: origenLng }}
+              anchor={{ x: 0.5, y: 1 }}
+            >
+              <View style={s.pickupMarker}>
+                <Text style={s.markerEmoji}>📍</Text>
+              </View>
+            </Marker>
+          )}
+        </MapView>
 
         <View style={s.mapOriginBadge}>
           <Text style={s.mapOriginTxt} numberOfLines={1}>{origenDir}</Text>
@@ -196,31 +240,11 @@ const s = StyleSheet.create({
 
   /* Mapa */
   mapArea: {
-    flex:            1,
-    backgroundColor: '#E4EDE4',
-    position:        'relative',
-    alignItems:      'center',
-    justifyContent:  'center',
+    flex:     1,
+    overflow: 'hidden',
   },
-  mH1:     { position: 'absolute', left: 0, right: 0, top: '33%', height: 1, backgroundColor: '#D2DDD2' },
-  mH2:     { position: 'absolute', left: 0, right: 0, top: '66%', height: 1, backgroundColor: '#D2DDD2' },
-  mV1:     { position: 'absolute', top: 0, bottom: 0, left: '33%', width: 1, backgroundColor: '#D2DDD2' },
-  mV2:     { position: 'absolute', top: 0, bottom: 0, left: '66%', width: 1, backgroundColor: '#D2DDD2' },
-  street1: { position: 'absolute', top: '45%', left: 0, right: 0, height: 8, backgroundColor: '#C8D5C8', opacity: 0.7 },
-  street2: { position: 'absolute', top: 0, bottom: 0, left: '42%', width: 8, backgroundColor: '#C8D5C8', opacity: 0.7 },
 
-  routeLine: {
-    position:        'absolute',
-    width:           3,
-    height:          100,
-    backgroundColor: C.yellow,
-    top:             '32%',
-    left:            '43%',
-    borderRadius:    2,
-    opacity:         0.8,
-  },
-  conductorPin: { position: 'absolute', top: '28%', left: '40%' },
-  conductorPinCircle: {
+  conductorMarker: {
     width:           44,
     height:          44,
     borderRadius:    22,
@@ -233,24 +257,23 @@ const s = StyleSheet.create({
     shadowRadius:    6,
     elevation:       5,
   },
-  conductorPinEmoji: { fontSize: 22 },
-  pickupPin: { position: 'absolute', top: '55%', left: '40%' },
-  pickupCircle: {
+  pickupMarker: {
     width:           38,
     height:          38,
     borderRadius:    19,
-    backgroundColor: C.black,
+    backgroundColor: C.green,
     alignItems:      'center',
     justifyContent:  'center',
+    elevation:       4,
   },
-  pickupEmoji: { fontSize: 18 },
+  markerEmoji: { fontSize: 20 },
 
   mapOriginBadge: {
     position:          'absolute',
     bottom:            12,
     left:              12,
     right:             12,
-    backgroundColor:   'rgba(255,255,255,0.9)',
+    backgroundColor:   'rgba(255,255,255,0.92)',
     borderRadius:      12,
     paddingHorizontal: 12,
     paddingVertical:   6,

@@ -33,6 +33,10 @@ export default function OfertasScreen({ params, navigate, goBack }) {
     serviceId       = '',
     origenDir       = '',
     destDir         = '',
+    origenLat       = 0,
+    origenLng       = 0,
+    destLat         = 0,
+    destLng         = 0,
   } = params;
 
   const [ofertasList, setOfertasList] = useState(ofertas);
@@ -59,6 +63,10 @@ export default function OfertasScreen({ params, navigate, goBack }) {
         precioPropuesto,
         origenDir,
         destDir,
+        origenLat,
+        origenLng,
+        destLat,
+        destLng,
         ofertaId:          oferta.id,
         conductorId:       oferta.conductor_id        || '',
         conductorNombre:   oferta.conductor_nombre    || 'Conductor',

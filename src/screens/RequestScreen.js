@@ -74,6 +74,10 @@ export default function RequestScreen({ params, navigate, goBack }) {
         precioPropuesto,
         origenDir:      origin.text,
         destDir:        dest.text,
+        origenLat:      origin.lat,
+        origenLng:      origin.lng,
+        destLat:        dest.lat,
+        destLng:        dest.lng,
       });
     } catch (err) {
       console.log('Error completo:', JSON.stringify(err));

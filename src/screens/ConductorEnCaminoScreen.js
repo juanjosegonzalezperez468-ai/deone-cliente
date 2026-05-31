@@ -96,6 +96,16 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
     Linking.openURL('tel:+573009000000').catch(() => {});
   };
 
+  const handleVerEnMapa = () => {
+    if (!conductorPos) return;
+    const { latitude: lat, longitude: lng } = conductorPos;
+    const googleUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    const geoUrl    = `geo:${lat},${lng}`;
+    Linking.canOpenURL(googleUrl)
+      .then((supported) => Linking.openURL(supported ? googleUrl : geoUrl))
+      .catch(() => Linking.openURL(geoUrl).catch(() => {}));
+  };
+
   const handleSOS = () => {
     Alert.alert(
       '¿Necesitas ayuda?',
@@ -205,6 +215,11 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
         {/* Botón llamar */}
         <TouchableOpacity style={s.btnLlamar} onPress={handleLlamar} activeOpacity={0.85}>
           <Text style={s.btnLlamarTxt}>📞  LLAMAR AL CONDUCTOR</Text>
+        </TouchableOpacity>
+
+        {/* Botón ver en mapa */}
+        <TouchableOpacity style={s.btnMapa} onPress={handleVerEnMapa} activeOpacity={0.85}>
+          <Text style={s.btnMapaTxt}>🗺️  VER EN MAPA</Text>
         </TouchableOpacity>
 
       </View>
@@ -374,6 +389,16 @@ const s = StyleSheet.create({
     alignItems:      'center',
     borderWidth:     1.5,
     borderColor:     C.black,
+    marginBottom:    10,
   },
   btnLlamarTxt: { color: C.black, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+
+  btnMapa: {
+    borderRadius:    18,
+    paddingVertical: 16,
+    alignItems:      'center',
+    borderWidth:     1.5,
+    borderColor:     C.yellow,
+  },
+  btnMapaTxt: { color: C.yellow, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Linking, Alert, Image,
+  StatusBar, Linking, Alert, Image, Modal,
 } from 'react-native';
+import ChatScreen from './ChatScreen';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { servicesApi, locationsApi } from '../api/client';
 import { isNocturno } from '../utils/fare';
@@ -49,6 +50,7 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
 
   const [eta, setEta]               = useState(3);
   const [conductorPos, setConductorPos] = useState(null);
+  const [chatVisible, setChatVisible]   = useState(false);
   const mapRef                      = useRef(null);
   const nocturno                    = isNocturno();
   const inicial                     = conductorNombre.charAt(0).toUpperCase();
@@ -222,7 +224,24 @@ export default function ConductorEnCaminoScreen({ params, navigate }) {
           <Text style={s.btnMapaTxt}>🗺️  VER EN MAPA</Text>
         </TouchableOpacity>
 
+        {/* Botón chat */}
+        <TouchableOpacity style={s.btnChat} onPress={() => setChatVisible(true)} activeOpacity={0.85}>
+          <Text style={s.btnChatTxt}>💬  CHAT</Text>
+        </TouchableOpacity>
+
       </View>
+
+      {/* Modal chat */}
+      <Modal
+        visible={chatVisible}
+        animationType="slide"
+        onRequestClose={() => setChatVisible(false)}
+      >
+        <ChatScreen
+          params={{ serviceDbId }}
+          onClose={() => setChatVisible(false)}
+        />
+      </Modal>
     </View>
   );
 }
@@ -399,6 +418,16 @@ const s = StyleSheet.create({
     alignItems:      'center',
     borderWidth:     1.5,
     borderColor:     C.yellow,
+    marginBottom:    10,
   },
   btnMapaTxt: { color: C.yellow, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+
+  btnChat: {
+    borderRadius:    18,
+    paddingVertical: 16,
+    alignItems:      'center',
+    borderWidth:     1.5,
+    borderColor:     C.yellow,
+  },
+  btnChatTxt: { color: C.yellow, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

@@ -50,4 +50,11 @@ export const locationsApi = {
     api.get(`/locations/conductor/${conductorId}`),
 };
 
+export const chatApi = {
+  getMensajes:   (serviceId, uid) =>
+    api.get(`/chat/${serviceId}/mensajes?reader_id=${uid}`),
+  enviarMensaje: (serviceId, data) =>
+    api.post(`/chat/${serviceId}/mensaje`, data),
+};
+
 export default api;

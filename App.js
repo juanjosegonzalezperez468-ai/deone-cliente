@@ -10,6 +10,7 @@ import OfertasScreen            from './src/screens/OfertasScreen';
 import ConductorEnCaminoScreen  from './src/screens/ConductorEnCaminoScreen';
 import ViajeEnCursoScreen       from './src/screens/ViajeEnCursoScreen';
 import ServicioFinalizadoScreen from './src/screens/ServicioFinalizadoScreen';
+import ChatScreen               from './src/screens/ChatScreen';
 
 export default function App() {
   const [screen, setScreen] = useState('Splash');
@@ -34,6 +35,7 @@ export default function App() {
   if (screen === 'ConductorEnCamino') return <ConductorEnCaminoScreen  params={params} navigate={navigate} goBack={goBack} />;
   if (screen === 'ViajeEnCurso')      return <ViajeEnCursoScreen       params={params} navigate={navigate} goBack={goBack} />;
   if (screen === 'ServicioFinalizado')return <ServicioFinalizadoScreen  params={params} goBack={goBack} />;
+  if (screen === 'Chat')              return <ChatScreen                 params={params} goBack={goBack} />;
   if (screen === 'Home')              return <HomeScreen               navigate={navigate} />;
   return <SplashScreen navigate={navigate} />;
 }

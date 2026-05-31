@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Share, Alert, Linking, Image,
+  StatusBar, Share, Alert, Linking, Image, Modal,
 } from 'react-native';
+import ChatScreen from './ChatScreen';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { servicesApi } from '../api/client';
@@ -39,8 +40,9 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
     destLng           = 0,
   } = params;
 
-  const [clientPos, setClientPos] = useState(null);
-  const mapRef                    = useRef(null);
+  const [clientPos, setClientPos]   = useState(null);
+  const [chatVisible, setChatVisible] = useState(false);
+  const mapRef                      = useRef(null);
   const inicial                   = conductorNombre.charAt(0).toUpperCase();
 
   // Obtain GPS position once
@@ -198,7 +200,24 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
           <Text style={s.btnCompartirTxt}>COMPARTIR VIAJE</Text>
         </TouchableOpacity>
 
+        {/* Botón chat */}
+        <TouchableOpacity style={s.btnChat} onPress={() => setChatVisible(true)} activeOpacity={0.85}>
+          <Text style={s.btnChatTxt}>💬  CHAT</Text>
+        </TouchableOpacity>
+
       </View>
+
+      {/* Modal chat */}
+      <Modal
+        visible={chatVisible}
+        animationType="slide"
+        onRequestClose={() => setChatVisible(false)}
+      >
+        <ChatScreen
+          params={{ serviceDbId }}
+          onClose={() => setChatVisible(false)}
+        />
+      </Modal>
     </View>
   );
 }
@@ -326,6 +345,16 @@ const s = StyleSheet.create({
     borderRadius:    18,
     paddingVertical: 16,
     alignItems:      'center',
+    marginBottom:    10,
   },
   btnCompartirTxt: { color: C.black, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+
+  btnChat: {
+    borderRadius:    18,
+    paddingVertical: 16,
+    alignItems:      'center',
+    borderWidth:     1.5,
+    borderColor:     C.yellow,
+  },
+  btnChatTxt: { color: C.yellow, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

@@ -47,7 +47,7 @@ export default function OfertasScreen({ params, navigate, goBack }) {
     const interval = setInterval(async () => {
       try {
         const { data } = await offersApi.porSolicitud(serviceDbId);
-        if (Array.isArray(data) && data.length > 0) setOfertasList(data);
+        if (Array.isArray(data.ofertas) && data.ofertas.length > 0) setOfertasList(data.ofertas);
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
@@ -68,12 +68,12 @@ export default function OfertasScreen({ params, navigate, goBack }) {
         destLat,
         destLng,
         ofertaId:          oferta.id,
-        conductorId:       oferta.conductor_id        || '',
-        conductorNombre:   oferta.conductor_nombre    || 'Conductor',
-        conductorRating:   oferta.conductor_rating    || 4.8,
-        conductorVehiculo: oferta.conductor_vehiculo  || 'Moto',
-        conductorPlaca:    oferta.conductor_placa     || '—',
-        precioAceptado:    oferta.precio_oferta       || precioPropuesto,
+        conductorId:       oferta.conductor_id                  || '',
+        conductorNombre:   oferta.users?.nombre                 || 'Conductor',
+        conductorRating:   oferta.users?.rating                 || 4.8,
+        conductorVehiculo: oferta.vehiculo?.tipo_servicio        || 'Moto',
+        conductorPlaca:    oferta.vehiculo?.placa                || '—',
+        precioAceptado:    oferta.precio_ofrecido                || precioPropuesto,
       });
     } catch {
       setLoadingId(null);
@@ -107,10 +107,10 @@ export default function OfertasScreen({ params, navigate, goBack }) {
         showsVerticalScrollIndicator={false}
       >
         {ofertasList.map((oferta) => {
-          const nombre    = oferta.conductor_nombre    || 'Conductor';
-          const rating    = oferta.conductor_rating    || 4.8;
-          const vehiculo  = oferta.conductor_vehiculo  || 'Moto';
-          const precio    = oferta.precio_oferta       || precioPropuesto;
+          const nombre    = oferta.users?.nombre                || 'Conductor';
+          const rating    = oferta.users?.rating                || 4.8;
+          const vehiculo  = oferta.vehiculo?.tipo_servicio      || 'Moto';
+          const precio    = oferta.precio_ofrecido              || precioPropuesto;
           const esExacto  = precio <= precioPropuesto;
           const inicial   = nombre.charAt(0).toUpperCase();
           const isLoading = loadingId === oferta.id;

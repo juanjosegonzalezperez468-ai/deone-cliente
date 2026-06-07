@@ -52,9 +52,9 @@ export default function WaitingScreen({ params, navigate, goBack }) {
     const interval = setInterval(async () => {
       try {
         const { data } = await offersApi.porSolicitud(serviceDbId);
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data.ofertas) && data.ofertas.length > 0) {
           clearInterval(interval);
-          navigate('Ofertas', { ...params, ofertas: data });
+          navigate('Ofertas', { ...params, ofertas: data.ofertas });
         }
       } catch {}
     }, 5000);

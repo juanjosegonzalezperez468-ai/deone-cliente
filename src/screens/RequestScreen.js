@@ -4,9 +4,8 @@ import {
   StyleSheet, StatusBar, TextInput, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SERVICES } from '../constants/services';
-import { API_URL } from '../constants/config';
 import { servicesApi } from '../api/client';
-import auth from '@react-native-firebase/auth';
+import { getUserUuid } from '../utils/tokenStorage';
 
 const C = {
   white: '#FFFFFF',
@@ -41,19 +40,21 @@ export default function RequestScreen({ params, navigate, goBack }) {
     ? price.length > 0 && parseInt(price, 10) > 0
     : true;
 
+  if (!origin || !dest) return null;
+
   const handleBuscar = async () => {
     if (!ready || loading) return;
     setLoading(true);
     try {
       const precioPropuesto = negotiable ? parseInt(price, 10) : fareInfo.adjusted;
-      const uid = auth().currentUser?.uid;
-      if (!uid) {
+      const clienteId = await getUserUuid();
+      if (!clienteId) {
         Alert.alert('Error', 'Debes iniciar sesión para solicitar un servicio.');
         setLoading(false);
         return;
       }
       const body = {
-        cliente_id:        uid,
+        cliente_id:        clienteId,
         tipo_servicio:     serviceId,
         precio_propuesto:  precioPropuesto,
         origen_lat:        origin.lat,
@@ -64,13 +65,10 @@ export default function RequestScreen({ params, navigate, goBack }) {
         destino_direccion: dest.text,
       };
 
-      console.log('URL:', API_URL);
-      console.log('Datos:', body);
-
       const { data } = await servicesApi.crear(body);
       navigate('Waiting', {
         serviceId,
-        serviceDbId:    data.id,
+        serviceDbId:    data.solicitud.id,
         precioPropuesto,
         origenDir:      origin.text,
         destDir:        dest.text,
@@ -80,12 +78,24 @@ export default function RequestScreen({ params, navigate, goBack }) {
         destLng:        dest.lng,
       });
     } catch (err) {
-      console.log('Error completo:', JSON.stringify(err));
-      const msg = err.response?.data?.detail
-        || err.response?.data?.message
-        || err.message
-        || 'No se pudo conectar al servidor. Verifica tu conexión.';
-      Alert.alert('Error', msg);
+      console.error('[RequestScreen] crear error:', JSON.stringify({
+        status: err.response?.status,
+        data:   err.response?.data,
+        code:   err.code,
+        msg:    err.message,
+        url:    err.config?.url,
+      }));
+      let msg;
+      if (err.code === 'ECONNABORTED') {
+        msg = 'El servidor tardó demasiado en responder. Intenta de nuevo.';
+      } else if (!err.response) {
+        msg = `No se pudo conectar al servidor (${err.message}). Verifica tu conexión o intenta más tarde.`;
+      } else {
+        msg = err.response?.data?.detail
+          || err.response?.data?.message
+          || `Error ${err.response.status}: ${err.message}`;
+      }
+      Alert.alert('Error de red', msg);
     } finally {
       setLoading(false);
     }

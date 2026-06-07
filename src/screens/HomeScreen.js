@@ -9,6 +9,9 @@ import * as Location from 'expo-location';
 import { SERVICES } from '../constants/services';
 import { GOOGLE_MAPS_KEY } from '../constants/config';
 import { isNegotiable, calcFare, getDirections } from '../utils/fare';
+import auth from '@react-native-firebase/auth';
+import { servicesApi, authApi } from '../api/client';
+import { getUserUuid, clearBackendToken, clearPhone, clearUserUuid } from '../utils/tokenStorage';
 
 const C = {
   white:      '#FFFFFF',
@@ -137,6 +140,26 @@ function FareSliderBar({ ratio, setRatio }) {
   );
 }
 
+const ESTADO_LABELS = {
+  pendiente:   'Buscando conductor',
+  negociando:  'Negociando',
+  confirmado:  'Confirmado',
+  en_camino:   'Conductor en camino',
+  en_servicio: 'En curso',
+  completado:  'Completado',
+  cancelado:   'Cancelado',
+};
+const ESTADO_COLORS = {
+  pendiente:   '#888888',
+  negociando:  '#F4C400',
+  confirmado:  '#22C55E',
+  en_camino:   '#3B82F6',
+  en_servicio: '#3B82F6',
+  completado:  '#22C55E',
+  cancelado:   '#FF3B30',
+};
+const ACTIVE_STATES = ['confirmado', 'en_camino', 'en_servicio'];
+
 export default function HomeScreen({ navigate }) {
   const [selected, setSelected]       = useState('');
   const [origin, setOrigin]           = useState({ text: '', lat: null, lng: null });
@@ -146,6 +169,45 @@ export default function HomeScreen({ navigate }) {
   const [fareLoading, setFareLoading] = useState(false);
   const [fareRatio, setFareRatio]     = useState(0);
   const originRef = useRef(null);
+  const uuidRef   = useRef('');
+
+  const [activeTab,        setActiveTab]        = useState('home');
+  const [historial,        setHistorial]        = useState([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [perfil,           setPerfil]           = useState(null);
+
+  useEffect(() => {
+    getUserUuid().then(id => { if (id) uuidRef.current = id; });
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'viajes') fetchHistorial();
+    if (activeTab === 'cuenta') fetchPerfil();
+  }, [activeTab]);
+
+  const fetchHistorial = async () => {
+    if (!uuidRef.current) return;
+    setLoadingHistorial(true);
+    try {
+      const { data } = await servicesApi.historial(uuidRef.current);
+      setHistorial(data.servicios || []);
+    } catch {}
+    setLoadingHistorial(false);
+  };
+
+  const fetchPerfil = async () => {
+    if (!uuidRef.current || perfil) return;
+    try {
+      const { data } = await authApi.perfil(uuidRef.current);
+      setPerfil(data);
+    } catch {}
+  };
+
+  const handleLogout = async () => {
+    await Promise.all([clearBackendToken(), clearPhone(), clearUserUuid()]);
+    await auth().signOut();
+    navigate('Login');
+  };
 
   useEffect(() => {
     if (!origin.lat || !dest.lat || !selected) {
@@ -225,7 +287,7 @@ export default function HomeScreen({ navigate }) {
     <View style={s.root}>
       <StatusBar backgroundColor={C.white} barStyle="dark-content" />
 
-      <ScrollView
+      {activeTab === 'home' && <ScrollView
         style={s.scroll}
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
@@ -367,26 +429,103 @@ export default function HomeScreen({ navigate }) {
             {ready ? '🔍  BUSCAR CONDUCTOR' : 'BUSCAR CONDUCTOR'}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
+      </ScrollView>}
+
+      {activeTab === 'viajes' && (
+        <ScrollView style={s.scroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.tabTitle}>Mis viajes</Text>
+          {loadingHistorial
+            ? <ActivityIndicator color={C.yellow} style={{ marginTop: 40 }} />
+            : historial.length === 0
+              ? (
+                <View style={s.emptyTab}>
+                  <Text style={s.emptyTabIcon}>🏍️</Text>
+                  <Text style={s.emptyTabTxt}>Aún no tienes viajes</Text>
+                </View>
+              )
+              : historial.map((srv) => {
+                  const svc      = SERVICES.find(x => x.id === srv.tipo_servicio);
+                  const color    = ESTADO_COLORS[srv.estado] || '#888888';
+                  const label    = ESTADO_LABELS[srv.estado]  || srv.estado;
+                  const precio   = srv.precio_final || srv.precio_propuesto;
+                  const isActive = ACTIVE_STATES.includes(srv.estado);
+                  return (
+                    <TouchableOpacity
+                      key={srv.id}
+                      style={s.histCard}
+                      activeOpacity={isActive ? 0.7 : 1}
+                      onPress={() => {
+                        if (!isActive) return;
+                        navigate('ViajeEnCurso', {
+                          serviceDbId:       srv.id,
+                          conductorId:       srv.conductor_id || '',
+                          conductorNombre:   'Conductor',
+                          conductorVehiculo: srv.tipo_servicio,
+                          precioAceptado:    precio,
+                          destDir:           srv.destino_direccion || '',
+                          destLat:           srv.destino_lat,
+                          destLng:           srv.destino_lng,
+                        });
+                      }}
+                    >
+                      <View style={s.histIconWrap}>
+                        <Text style={s.histIcon}>{svc ? svc.icon : '🚗'}</Text>
+                      </View>
+                      <View style={s.histInfo}>
+                        <Text style={s.histDest} numberOfLines={1}>{srv.destino_direccion || '—'}</Text>
+                        <Text style={s.histOrigen} numberOfLines={1}>{srv.origen_direccion || ''}</Text>
+                      </View>
+                      <View style={s.histRight}>
+                        <Text style={s.histPrecio}>${Number(precio).toLocaleString('es-CO')}</Text>
+                        <View style={[s.histBadge, { backgroundColor: color + '22' }]}>
+                          <Text style={[s.histBadgeTxt, { color }]}>{label}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+          }
+        </ScrollView>
+      )}
+
+      {activeTab === 'cuenta' && (
+        <ScrollView style={s.scroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.tabTitle}>Mi cuenta</Text>
+          <View style={s.avatarWrap}>
+            <View style={s.avatar}>
+              <Text style={s.avatarTxt}>
+                {(perfil?.nombre || 'U').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={s.cuentaNombre}>{perfil?.nombre || 'Usuario'}</Text>
+            {perfil?.telefono ? <Text style={s.cuentaPhone}>{perfil.telefono}</Text> : null}
+          </View>
+          <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Text style={s.logoutTxt}>CERRAR SESIÓN</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
       {/* Barra de navegación inferior */}
       <View style={s.bottomNav}>
-        <TouchableOpacity style={s.navItem} activeOpacity={0.7}>
-          <Text style={s.navIconActive}>⌂</Text>
-          <Text style={s.navLabelActive}>Inicio</Text>
-          <View style={s.navActiveDot} />
+        <TouchableOpacity style={s.navItem} onPress={() => setActiveTab('home')} activeOpacity={0.7}>
+          <Text style={activeTab === 'home' ? s.navIconActive : s.navIcon}>⌂</Text>
+          <Text style={activeTab === 'home' ? s.navLabelActive : s.navLabel}>Inicio</Text>
+          {activeTab === 'home' && <View style={s.navActiveDot} />}
         </TouchableOpacity>
-        <TouchableOpacity style={s.navItem} activeOpacity={0.7}>
-          <Text style={s.navIcon}>🚗</Text>
-          <Text style={s.navLabel}>Viajes</Text>
+        <TouchableOpacity style={s.navItem} onPress={() => setActiveTab('viajes')} activeOpacity={0.7}>
+          <Text style={activeTab === 'viajes' ? s.navIconActive : s.navIcon}>🚗</Text>
+          <Text style={activeTab === 'viajes' ? s.navLabelActive : s.navLabel}>Viajes</Text>
+          {activeTab === 'viajes' && <View style={s.navActiveDot} />}
         </TouchableOpacity>
         <TouchableOpacity style={s.navItem} activeOpacity={0.7}>
           <Text style={s.navIcon}>✉</Text>
           <Text style={s.navLabel}>Mensajes</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.navItem} activeOpacity={0.7}>
-          <Text style={s.navIcon}>◎</Text>
-          <Text style={s.navLabel}>Cuenta</Text>
+        <TouchableOpacity style={s.navItem} onPress={() => setActiveTab('cuenta')} activeOpacity={0.7}>
+          <Text style={activeTab === 'cuenta' ? s.navIconActive : s.navIcon}>◎</Text>
+          <Text style={activeTab === 'cuenta' ? s.navLabelActive : s.navLabel}>Cuenta</Text>
+          {activeTab === 'cuenta' && <View style={s.navActiveDot} />}
         </TouchableOpacity>
       </View>
     </View>
@@ -513,4 +652,62 @@ const s = StyleSheet.create({
   navActiveDot:   { width: 4, height: 4, borderRadius: 2, backgroundColor: C.yellow, marginTop: 3 },
   navIcon:        { fontSize: 20, color: C.grayLight, marginBottom: 2 },
   navLabel:       { fontSize: 11, color: C.grayLight, fontWeight: '500' },
+
+  /* Tab views */
+  tabContent:  { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 32 },
+  tabTitle:    { color: C.black, fontSize: 28, fontWeight: '800', marginBottom: 20 },
+  emptyTab:    { alignItems: 'center', paddingTop: 60 },
+  emptyTabIcon:{ fontSize: 44, marginBottom: 12 },
+  emptyTabTxt: { color: C.grayLight, fontSize: 15 },
+
+  histCard: {
+    backgroundColor: C.white,
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: C.grayBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  histIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.yellowLight,
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 12,
+  },
+  histIcon:    { fontSize: 20 },
+  histInfo:    { flex: 1 },
+  histDest:    { color: C.black,     fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  histOrigen:  { color: C.grayLight, fontSize: 12 },
+  histRight:   { alignItems: 'flex-end', marginLeft: 8 },
+  histPrecio:  { color: C.black, fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  histBadge:   { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  histBadgeTxt:{ fontSize: 10, fontWeight: '700' },
+
+  avatarWrap:   { alignItems: 'center', paddingTop: 20, marginBottom: 40 },
+  avatar: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: C.yellow,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  avatarTxt:    { color: C.black, fontSize: 36, fontWeight: '800' },
+  cuentaNombre: { color: C.black,     fontSize: 22, fontWeight: '700', marginBottom: 4 },
+  cuentaPhone:  { color: C.grayLight, fontSize: 15 },
+
+  logoutBtn: {
+    marginHorizontal: 32,
+    borderWidth: 1.5,
+    borderColor: '#FF3B30',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  logoutTxt: { color: '#FF3B30', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
 });

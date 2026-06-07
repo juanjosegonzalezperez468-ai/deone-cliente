@@ -5,6 +5,8 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import { authApi } from '../api/client';
+import { storeBackendToken, storePhone, storeUserUuid } from '../utils/tokenStorage';
 
 export default function OTPScreen({ params, navigate }) {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
@@ -57,10 +59,18 @@ export default function OTPScreen({ params, navigate }) {
     try {
       const result = await params.confirmation.confirm(code);
       const idToken = await result.user.getIdToken();
+      await storePhone(params.telefono);
       if (result.additionalUserInfo?.isNewUser) {
         navigate('Registro', { telefono: params.telefono, idToken });
       } else {
-        navigate('Home');
+        try {
+          const { data } = await authApi.registrar(params.telefono, 'cliente', 'usuario', idToken);
+          await storeBackendToken(data.token);
+          await storeUserUuid(data.usuario.id);
+          navigate('Home');
+        } catch {
+          navigate('Registro', { telefono: params.telefono, idToken });
+        }
       }
     } catch {
       Alert.alert('Código inválido', 'El código ingresado no es correcto. Intenta de nuevo.');

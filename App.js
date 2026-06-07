@@ -13,18 +13,17 @@ import ServicioFinalizadoScreen from './src/screens/ServicioFinalizadoScreen';
 import ChatScreen               from './src/screens/ChatScreen';
 
 export default function App() {
-  const [screen, setScreen] = useState('Splash');
-  const [params, setParams] = useState({});
+  const [route, setRoute] = useState({ screen: 'Splash', params: {} });
 
   const navigate = (screenName, screenParams) => {
-    setParams(screenParams || {});
-    setScreen(screenName);
+    setRoute({ screen: screenName, params: screenParams || {} });
   };
 
   const goBack = () => {
-    setParams({});
-    setScreen('Home');
+    setRoute({ screen: 'Home', params: {} });
   };
+
+  const { screen, params } = route;
 
   if (screen === 'Login')             return <LoginScreen              navigate={navigate} />;
   if (screen === 'OTP')               return <OTPScreen                params={params} navigate={navigate} />;

@@ -181,7 +181,7 @@ export default function HomeScreen({ navigate }) {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'viajes') fetchHistorial();
+    if (activeTab === 'viajes' || activeTab === 'mensajes') fetchHistorial();
     if (activeTab === 'cuenta') fetchPerfil();
   }, [activeTab]);
 
@@ -488,6 +488,49 @@ export default function HomeScreen({ navigate }) {
         </ScrollView>
       )}
 
+      {activeTab === 'mensajes' && (
+        <ScrollView style={s.scroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.tabTitle}>Mensajes</Text>
+          {loadingHistorial
+            ? <ActivityIndicator color={C.yellow} style={{ marginTop: 40 }} />
+            : (() => {
+                const conChat = historial.filter(srv =>
+                  ['confirmado', 'en_camino', 'en_servicio'].includes(srv.estado) && srv.conductor_id
+                );
+                if (conChat.length === 0) return (
+                  <View style={s.emptyTab}>
+                    <Text style={s.emptyTabIcon}>💬</Text>
+                    <Text style={s.emptyTabTxt}>No tienes conversaciones activas</Text>
+                  </View>
+                );
+                return conChat.map(srv => {
+                  const svc = SERVICES.find(x => x.id === srv.tipo_servicio);
+                  return (
+                    <TouchableOpacity
+                      key={srv.id}
+                      style={s.histCard}
+                      activeOpacity={0.7}
+                      onPress={() => navigate('Chat', {
+                        serviceDbId:     srv.id,
+                        conductorNombre: 'Conductor',
+                      })}
+                    >
+                      <View style={s.histIconWrap}>
+                        <Text style={s.histIcon}>{svc ? svc.icon : '🚗'}</Text>
+                      </View>
+                      <View style={s.histInfo}>
+                        <Text style={s.histDest} numberOfLines={1}>Chat — {svc?.label || srv.tipo_servicio}</Text>
+                        <Text style={s.histOrigen} numberOfLines={1}>{srv.destino_direccion || ''}</Text>
+                      </View>
+                      <Text style={s.chatArrow}>→</Text>
+                    </TouchableOpacity>
+                  );
+                });
+              })()
+          }
+        </ScrollView>
+      )}
+
       {activeTab === 'cuenta' && (
         <ScrollView style={s.scroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
           <Text style={s.tabTitle}>Mi cuenta</Text>
@@ -518,9 +561,10 @@ export default function HomeScreen({ navigate }) {
           <Text style={activeTab === 'viajes' ? s.navLabelActive : s.navLabel}>Viajes</Text>
           {activeTab === 'viajes' && <View style={s.navActiveDot} />}
         </TouchableOpacity>
-        <TouchableOpacity style={s.navItem} activeOpacity={0.7}>
-          <Text style={s.navIcon}>✉</Text>
-          <Text style={s.navLabel}>Mensajes</Text>
+        <TouchableOpacity style={s.navItem} onPress={() => setActiveTab('mensajes')} activeOpacity={0.7}>
+          <Text style={activeTab === 'mensajes' ? s.navIconActive : s.navIcon}>✉</Text>
+          <Text style={activeTab === 'mensajes' ? s.navLabelActive : s.navLabel}>Mensajes</Text>
+          {activeTab === 'mensajes' && <View style={s.navActiveDot} />}
         </TouchableOpacity>
         <TouchableOpacity style={s.navItem} onPress={() => setActiveTab('cuenta')} activeOpacity={0.7}>
           <Text style={activeTab === 'cuenta' ? s.navIconActive : s.navIcon}>◎</Text>
@@ -689,6 +733,7 @@ const s = StyleSheet.create({
   histPrecio:  { color: C.black, fontSize: 14, fontWeight: '700', marginBottom: 4 },
   histBadge:   { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   histBadgeTxt:{ fontSize: 10, fontWeight: '700' },
+  chatArrow:   { color: C.yellow, fontSize: 18, fontWeight: '700', marginLeft: 8 },
 
   avatarWrap:   { alignItems: 'center', paddingTop: 20, marginBottom: 40 },
   avatar: {

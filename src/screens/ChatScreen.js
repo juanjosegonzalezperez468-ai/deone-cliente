@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import auth from '@react-native-firebase/auth';
+import { getUserUuid } from '../utils/tokenStorage';
 import { chatApi } from '../api/client';
 
 const C = {
@@ -36,8 +36,8 @@ const formatTime = (iso) => {
 
 export default function ChatScreen({ params = {}, goBack, onClose }) {
   const { serviceDbId = '' } = params;
-  const uid         = auth().currentUser?.uid || '';
   const handleClose = onClose || goBack || (() => {});
+  const uuidRef     = useRef('');
 
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto]       = useState('');
@@ -47,14 +47,20 @@ export default function ChatScreen({ params = {}, goBack, onClose }) {
   const fetchMensajes = async () => {
     if (!serviceDbId) return;
     try {
-      const { data } = await chatApi.getMensajes(serviceDbId, uid);
+      const { data } = await chatApi.getMensajes(serviceDbId, uuidRef.current);
       if (Array.isArray(data)) setMensajes(data);
     } catch {}
   };
 
   useEffect(() => {
-    fetchMensajes();
-    const interval = setInterval(fetchMensajes, 3000);
+    let interval;
+    getUserUuid().then((uuid) => {
+      if (uuid) uuidRef.current = uuid;
+      if (serviceDbId) {
+        fetchMensajes();
+        interval = setInterval(fetchMensajes, 3000);
+      }
+    });
     return () => clearInterval(interval);
   }, [serviceDbId]);
 
@@ -65,7 +71,7 @@ export default function ChatScreen({ params = {}, goBack, onClose }) {
     setTexto('');
     try {
       await chatApi.enviarMensaje(serviceDbId, {
-        sender_id:   uid,
+        sender_id:   uuidRef.current,
         sender_tipo: 'cliente',
         mensaje:     msg,
       });

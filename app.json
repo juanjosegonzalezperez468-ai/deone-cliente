@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "deone-cliente",
+    "name": "Deone",
     "slug": "deone-cliente",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -43,8 +43,7 @@
     "plugins": [
       "expo-font",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth",
-      "react-native-maps"
+      "@react-native-firebase/auth"
     ],
     "extra": {
       "eas": {

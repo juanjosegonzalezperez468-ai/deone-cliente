@@ -31,7 +31,7 @@ const SHADOW = {
   elevation:     4,
 };
 
-const ESTADOS_VIAJE = ['en_viaje', 'iniciado', 'viaje_iniciado', 'on_trip'];
+const ESTADOS_VIAJE = ['en_servicio', 'completado'];
 
 export default function ConductorEnCaminoScreen({ params, navigate }) {
   const {

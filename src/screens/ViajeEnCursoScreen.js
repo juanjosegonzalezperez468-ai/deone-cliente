@@ -26,7 +26,7 @@ const SHADOW = {
   elevation:     4,
 };
 
-const ESTADOS_FINALIZADO = ['finalizado', 'completado', 'terminado', 'finished'];
+const ESTADOS_FINALIZADO = ['completado'];
 
 export default function ViajeEnCursoScreen({ params, navigate }) {
   const {

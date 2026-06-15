@@ -28,7 +28,7 @@ const SHADOW = {
 
 const ESTADOS_FINALIZADO = ['completado'];
 
-export default function ViajeEnCursoScreen({ params, navigate }) {
+export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
   const {
     conductorNombre   = 'Conductor',
     conductorVehiculo = 'Moto',
@@ -74,6 +74,15 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
     const interval = setInterval(async () => {
       try {
         const { data } = await servicesApi.obtener(serviceDbId);
+        if (data?.estado === 'cancelado') {
+          clearInterval(interval);
+          Alert.alert(
+            'Viaje cancelado',
+            'El conductor canceló el viaje en curso.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+          return;
+        }
         if (ESTADOS_FINALIZADO.includes(data?.estado)) {
           clearInterval(interval);
           navigate('ServicioFinalizado', {
@@ -203,6 +212,24 @@ export default function ViajeEnCursoScreen({ params, navigate }) {
         {/* Botón chat */}
         <TouchableOpacity style={s.btnChat} onPress={() => setChatVisible(true)} activeOpacity={0.85}>
           <Text style={s.btnChatTxt}>💬  CHAT</Text>
+        </TouchableOpacity>
+
+        {/* Salir al inicio */}
+        <TouchableOpacity
+          style={s.btnSalir}
+          onPress={() =>
+            Alert.alert(
+              'Salir del viaje',
+              '¿Seguro que quieres volver al inicio? El viaje seguirá activo en el servidor.',
+              [
+                { text: 'Quedarme', style: 'cancel' },
+                { text: 'Salir al inicio', style: 'destructive', onPress: goBack },
+              ]
+            )
+          }
+          activeOpacity={0.7}
+        >
+          <Text style={s.btnSalirTxt}>SALIR AL INICIO</Text>
         </TouchableOpacity>
 
       </View>
@@ -357,4 +384,7 @@ const s = StyleSheet.create({
     borderColor:     C.yellow,
   },
   btnChatTxt: { color: C.yellow, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+
+  btnSalir:    { paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  btnSalirTxt: { color: C.red, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
 });

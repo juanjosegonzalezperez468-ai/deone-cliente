@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Animated, Image,
+  StatusBar, Animated, Image, Alert,
 } from 'react-native';
 import { SERVICES } from '../constants/services';
-import { offersApi } from '../api/client';
+import { offersApi, servicesApi } from '../api/client';
 
 const C = {
   white: '#FFFFFF',
@@ -46,15 +46,57 @@ export default function WaitingScreen({ params, navigate, goBack }) {
     ).start();
   }, []);
 
-  // Polling cada 5s para detectar ofertas de conductores
+  // Polling cada 5s para detectar ofertas (contraoferta) o aceptación directa del conductor
   useEffect(() => {
     if (!serviceDbId) return;
+    let navigated = false;
+
     const interval = setInterval(async () => {
+      if (navigated) return;
       try {
-        const { data } = await offersApi.porSolicitud(serviceDbId);
-        if (Array.isArray(data.ofertas) && data.ofertas.length > 0) {
+        // Flujo contraoferta: el conductor propone precio, el cliente elige
+        const { data: ofertasData } = await offersApi.porSolicitud(serviceDbId);
+        if (Array.isArray(ofertasData.ofertas) && ofertasData.ofertas.length > 0) {
+          navigated = true;
           clearInterval(interval);
-          navigate('Ofertas', { ...params, ofertas: data.ofertas });
+          navigate('Ofertas', { ...params, ofertas: ofertasData.ofertas });
+          return;
+        }
+
+        // Flujo aceptación directa: el conductor aceptó al precio del cliente
+        const { data: serviceData } = await servicesApi.obtener(serviceDbId);
+
+        if (serviceData?.estado === 'cancelado') {
+          navigated = true;
+          clearInterval(interval);
+          Alert.alert(
+            'Solicitud cancelada',
+            'El conductor canceló la solicitud.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+          return;
+        }
+
+        const ASIGNADO = ['confirmado', 'en_camino', 'en_servicio', 'aceptado'];
+        if (ASIGNADO.includes(serviceData?.estado) && serviceData?.conductor_id) {
+          navigated = true;
+          clearInterval(interval);
+          navigate('ConductorEnCamino', {
+            serviceDbId,
+            precioPropuesto:   params.precioPropuesto,
+            origenDir:         params.origenDir,
+            destDir:           params.destDir,
+            origenLat:         params.origenLat,
+            origenLng:         params.origenLng,
+            destLat:           params.destLat,
+            destLng:           params.destLng,
+            conductorId:       serviceData.conductor_id,
+            conductorNombre:   serviceData.conductor?.nombre                    || 'Conductor',
+            conductorRating:   serviceData.conductor?.rating                    || 4.8,
+            conductorVehiculo: serviceData.conductor?.vehiculo?.tipo_servicio   || 'Moto',
+            conductorPlaca:    serviceData.conductor?.vehiculo?.placa           || '—',
+            precioAceptado:    serviceData.precio_final || params.precioPropuesto,
+          });
         }
       } catch {}
     }, 5000);

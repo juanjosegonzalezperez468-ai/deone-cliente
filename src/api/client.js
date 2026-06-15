@@ -5,7 +5,7 @@ import { getBackendToken, storeBackendToken, clearBackendToken, getPhone } from 
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },

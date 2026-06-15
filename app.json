@@ -30,12 +30,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.deone.cliente",
-      "config": {
-        "googleMaps": {
-          "apiKey": "$EXPO_PUBLIC_GOOGLE_MAPS_KEY"
-        }
-      }
+      "package": "com.deone.cliente"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -83,6 +83,15 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
           );
           return;
         }
+        if (data?.estado === 'expirado') {
+          clearInterval(interval);
+          Alert.alert(
+            'Servicio expirado',
+            'Este servicio ya no está disponible.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+          return;
+        }
         if (ESTADOS_FINALIZADO.includes(data?.estado)) {
           clearInterval(interval);
           navigate('ServicioFinalizado', {

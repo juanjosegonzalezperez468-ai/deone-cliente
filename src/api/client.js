@@ -48,6 +48,16 @@ api.interceptors.response.use(
         _refreshing = false;
       }
     }
+    if (error.response?.status === 429) {
+      error.friendlyMessage = 'Demasiadas solicitudes. Espera un momento e intenta de nuevo.';
+    }
+    if (error.response?.status === 422) {
+      const detail = error.response?.data?.detail;
+      error.friendlyMessage =
+        typeof detail === 'object' && detail?.mensaje
+          ? detail.mensaje
+          : 'Datos inválidos. Revisa la información e intenta de nuevo.';
+    }
     _refreshing = false;
     return Promise.reject(error);
   },

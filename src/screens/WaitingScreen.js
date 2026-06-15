@@ -77,6 +77,17 @@ export default function WaitingScreen({ params, navigate, goBack }) {
           return;
         }
 
+        if (serviceData?.estado === 'expirado') {
+          navigated = true;
+          clearInterval(interval);
+          Alert.alert(
+            'Solicitud expirada',
+            'No se encontró conductor a tiempo. Intenta de nuevo.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+          return;
+        }
+
         const ASIGNADO = ['confirmado', 'en_camino', 'en_servicio', 'aceptado'];
         if (ASIGNADO.includes(serviceData?.estado) && serviceData?.conductor_id) {
           navigated = true;

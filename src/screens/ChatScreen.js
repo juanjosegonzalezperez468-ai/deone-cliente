@@ -48,7 +48,7 @@ export default function ChatScreen({ params = {}, goBack, onClose }) {
     if (!serviceDbId) return;
     try {
       const { data } = await chatApi.getMensajes(serviceDbId, uuidRef.current);
-      if (Array.isArray(data)) setMensajes(data);
+      if (Array.isArray(data?.mensajes)) setMensajes(data.mensajes);
     } catch {}
   };
 

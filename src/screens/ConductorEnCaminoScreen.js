@@ -71,6 +71,15 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
           );
           return;
         }
+        if (data?.estado === 'expirado') {
+          clearInterval(interval);
+          Alert.alert(
+            'Servicio expirado',
+            'Este servicio ya no está disponible.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+          return;
+        }
         if (ESTADOS_VIAJE.includes(data?.estado)) {
           clearInterval(interval);
           navigate('ViajeEnCurso', params);

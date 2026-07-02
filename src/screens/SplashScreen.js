@@ -4,6 +4,7 @@ import axios from 'axios';
 import auth from '@react-native-firebase/auth';
 import { API_URL } from '../constants/config';
 import { getBackendToken, storeBackendToken, getPhone, getUserUuid, storeUserUuid } from '../utils/tokenStorage';
+import { registrarNotificacionesPush } from '../utils/notifications';
 
 const ACTIVE_STATES = ['confirmado', 'en_camino', 'en_servicio'];
 
@@ -28,6 +29,8 @@ export default function SplashScreen({ navigate }) {
         let uuid = await getUserUuid();
         let jwt  = await getBackendToken();
 
+        let terminos_aceptados = true;
+
         if (!uuid || !jwt) {
           // Restore session silently
           const phone = await getPhone();
@@ -40,8 +43,17 @@ export default function SplashScreen({ navigate }) {
           );
           jwt  = data.token;
           uuid = data.usuario.id;
+          terminos_aceptados = data.usuario.terminos_aceptados ?? true;
           await storeBackendToken(jwt);
           await storeUserUuid(uuid);
+        }
+
+        // No bloquea la navegación: el permiso de notificaciones puede tardar/mostrar diálogo
+        registrarNotificacionesPush(uuid);
+
+        if (!terminos_aceptados) {
+          navigate('Terminos');
+          return;
         }
 
         const activeTrip = await checkActiveTrip(uuid, jwt);

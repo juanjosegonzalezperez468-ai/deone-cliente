@@ -70,6 +70,8 @@ export const authApi = {
   registrar: (telefono, tipo, nombre, idToken) =>
     api.post('/auth/verificar-otp', { telefono, token: idToken, tipo, nombre }),
   perfil: (uid) => api.get(`/auth/perfil/${uid}`),
+  registrarFcmToken: (uid, fcm_token) => api.patch(`/auth/perfil/${uid}/fcm-token`, { fcm_token }),
+  aceptarTerminos: (uid) => api.patch(`/auth/perfil/${uid}/terminos`),
 };
 
 export const servicesApi = {
@@ -77,6 +79,7 @@ export const servicesApi = {
   ofertas:  (serviceId)  => api.get(`/services/${serviceId}/ofertas`),
   obtener:  (serviceId)  => api.get(`/services/${serviceId}`),
   historial:(clienteId)  => api.get(`/services/cliente/${clienteId}`),
+  cancelar: (serviceId)  => api.patch(`/services/${serviceId}/estado`, { estado: 'cancelado' }),
 };
 
 export const offersApi = {

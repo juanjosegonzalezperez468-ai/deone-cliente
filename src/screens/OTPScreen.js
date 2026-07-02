@@ -7,6 +7,7 @@ import {
 import auth from '@react-native-firebase/auth';
 import { authApi } from '../api/client';
 import { storeBackendToken, storePhone, storeUserUuid } from '../utils/tokenStorage';
+import { registrarNotificacionesPush } from '../utils/notifications';
 
 export default function OTPScreen({ params, navigate }) {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
@@ -67,7 +68,12 @@ export default function OTPScreen({ params, navigate }) {
           const { data } = await authApi.registrar(params.telefono, 'cliente', 'usuario', idToken);
           await storeBackendToken(data.token);
           await storeUserUuid(data.usuario.id);
-          navigate('Home');
+          registrarNotificacionesPush(data.usuario.id);
+          if (!data.usuario.terminos_aceptados) {
+            navigate('Terminos');
+          } else {
+            navigate('Home');
+          }
         } catch {
           navigate('Registro', { telefono: params.telefono, idToken });
         }

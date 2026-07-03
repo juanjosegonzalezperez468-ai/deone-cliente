@@ -81,7 +81,32 @@
       "Bash(eas build:cancel b5bc28ff-4847-4bff-90a6-d0b585767650 --non-interactive)",
       "Bash(eas build:cancel c2c551d8-ea2c-44d6-bd41-a582ccf1a94e --non-interactive)",
       "Bash(Get-ChildItem -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/routers/services.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(/c/Users/juanj/AppData/Local/Android/Sdk/emulator/emulator *)",
+      "Bash(venv/Scripts/python.exe --version)",
+      "Bash(venv/bin/python --version)",
+      "Bash(venv/Scripts/uvicorn.exe app.main:socket_app --host 127.0.0.1 --port 8123)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(venv/Scripts/python.exe -m pip install -r requirements.txt)",
+      "Bash(powershell -NoProfile -Command \"Get-Process -Name uvicorn -ErrorAction SilentlyContinue | Select-Object Id,ProcessName\")",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app/routers/services.py', encoding='utf-8'\\).read\\(\\)\\); print\\('sintaxis OK'\\)\")",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(grep -ril \"notification\" android/app/src/main/res/values/*.xml)",
+      "Bash(grep -i \"viajes\\\\|notification_color\\\\|notification_icon\" android/app/src/main/res/values/colors.xml android/app/src/main/res/values/strings.xml)",
+      "Bash(find app/websocket -type f)",
+      "Bash(cat app/websocket/manager.py)",
+      "Bash(grep -rln \"socket.io-client\\\\|socketio\\\\|io\\(\" deone-cliente/src deone-conductor/src deone-web/src)",
+      "Bash(grep -l \"socket.io-client\" deone-cliente/package.json deone-conductor/package.json deone-web/package.json)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app/routers/locations.py', encoding='utf-8'\\).read\\(\\)\\); print\\('sintaxis OK'\\)\")",
+      "Bash(npm install *)",
+      "Bash(git apply *)",
+      "Bash(rm _my_change.patch /tmp/full_diff.patch)",
+      "Bash(find src/utils -type f)",
+      "Bash(cat src/utils/tokenStorage.js)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app/routers/penalties.py', encoding='utf-8'\\).read\\(\\)\\); print\\('sintaxis OK'\\)\")",
+      "Bash(cygpath -w /tmp/full_es.patch)",
+      "Bash(rm -f /tmp/full_es.patch /tmp/my_only.patch)"
     ]
   }
 }

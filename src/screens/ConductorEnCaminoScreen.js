@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Linking, Alert, Image, Modal,
+  StatusBar, Linking, Alert, Image, Modal, BackHandler,
 } from 'react-native';
 import ChatScreen from './ChatScreen';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { servicesApi, locationsApi } from '../api/client';
 import { isNocturno } from '../utils/fare';
+import { connectTripSocket } from '../utils/socket';
 
 const C = {
   bg:          '#F8F8F8',
@@ -50,20 +51,26 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
 
   const [eta, setEta]               = useState(3);
   const [conductorPos, setConductorPos] = useState(null);
+  const [conductorTelefono, setConductorTelefono] = useState('');
   const [chatVisible, setChatVisible]   = useState(false);
+  const [cancelando, setCancelando]     = useState(false);
   const mapRef                      = useRef(null);
   const nocturno                    = isNocturno();
   const inicial                     = conductorNombre.charAt(0).toUpperCase();
 
-  // Poll trip state every 10s
+  // Poll trip state every 10s (y una vez de inmediato al entrar)
   useEffect(() => {
     if (!serviceDbId) return;
-    const interval = setInterval(async () => {
+    let cancelled = false;
+
+    const fetchTripState = async () => {
       try {
         const { data } = await servicesApi.obtener(serviceDbId);
+        if (cancelled) return;
         if (data?.eta_minutos) setEta(data.eta_minutos);
+        if (data?.conductor?.telefono) setConductorTelefono(data.conductor.telefono);
         if (data?.estado === 'cancelado') {
-          clearInterval(interval);
+          cancelled = true;
           Alert.alert(
             'Viaje cancelado',
             'El conductor canceló el viaje.',
@@ -72,7 +79,7 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
           return;
         }
         if (data?.estado === 'expirado') {
-          clearInterval(interval);
+          cancelled = true;
           Alert.alert(
             'Servicio expirado',
             'Este servicio ya no está disponible.',
@@ -81,39 +88,68 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
           return;
         }
         if (ESTADOS_VIAJE.includes(data?.estado)) {
-          clearInterval(interval);
+          cancelled = true;
           navigate('ViajeEnCurso', params);
-        }
-      } catch {}
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [serviceDbId]);
-
-  // Poll conductor location every 10s
-  useEffect(() => {
-    if (!conductorId) return;
-
-    const fetchPos = async () => {
-      try {
-        const { data } = await locationsApi.obtenerConductor(conductorId);
-        if (data?.lat && data?.lng) {
-          const pos = { latitude: data.lat, longitude: data.lng };
-          setConductorPos(pos);
-          mapRef.current?.animateToRegion(
-            { ...pos, latitudeDelta: 0.04, longitudeDelta: 0.04 },
-            500,
-          );
         }
       } catch {}
     };
 
-    fetchPos();
-    const interval = setInterval(fetchPos, 10000);
-    return () => clearInterval(interval);
-  }, [conductorId]);
+    fetchTripState();
+    const interval = setInterval(() => {
+      if (!cancelled) fetchTripState();
+    }, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [serviceDbId]);
+
+  // Ubicación del conductor: un fetch inicial por REST (para no esperar el
+  // primer movimiento) y luego tiempo real por socket en vez de polling.
+  useEffect(() => {
+    if (!conductorId || !serviceDbId) return;
+    let socket;
+    let cancelled = false;
+
+    const aplicarPos = (lat, lng) => {
+      const pos = { latitude: lat, longitude: lng };
+      setConductorPos(pos);
+      mapRef.current?.animateToRegion(
+        { ...pos, latitudeDelta: 0.04, longitudeDelta: 0.04 },
+        500,
+      );
+    };
+
+    locationsApi.obtenerConductor(conductorId)
+      .then(({ data }) => {
+        if (!cancelled && data?.lat && data?.lng) aplicarPos(data.lat, data.lng);
+      })
+      .catch(() => {});
+
+    connectTripSocket(serviceDbId, (data) => {
+      if (!cancelled) aplicarPos(data.lat, data.lng);
+    }).then((s) => {
+      if (cancelled) { s?.disconnect(); return; }
+      socket = s;
+    });
+
+    return () => {
+      cancelled = true;
+      socket?.disconnect();
+    };
+  }, [conductorId, serviceDbId]);
 
   const handleLlamar = () => {
-    Linking.openURL('tel:+573009000000').catch(() => {});
+    if (!conductorTelefono) {
+      Alert.alert(
+        'Número no disponible',
+        'Aún no tenemos el número del conductor. Intenta de nuevo en unos segundos o usa el chat.',
+      );
+      return;
+    }
+    const digits = conductorTelefono.replace(/\D/g, '');
+    const numero = digits.startsWith('57') ? `+${digits}` : `+57${digits}`;
+    Linking.openURL(`tel:${numero}`).catch(() => {});
   };
 
   const handleVerEnMapa = () => {
@@ -125,6 +161,54 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
       .then((supported) => Linking.openURL(supported ? googleUrl : geoUrl))
       .catch(() => Linking.openURL(geoUrl).catch(() => {}));
   };
+
+  const handleCancelar = () => {
+    if (cancelando) return;
+    Alert.alert(
+      'Cancelar viaje',
+      'El conductor ya fue asignado. ¿Seguro que quieres cancelar el viaje?',
+      [
+        { text: 'No, continuar', style: 'cancel' },
+        {
+          text: 'Sí, cancelar',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelando(true);
+            try {
+              await servicesApi.cancelar(serviceDbId);
+              goBack();
+            } catch (e) {
+              setCancelando(false);
+              Alert.alert(
+                'No se pudo cancelar',
+                e?.friendlyMessage || 'Intenta de nuevo en unos segundos.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleVolverInicio = () => {
+    Alert.alert(
+      'Volver al inicio',
+      'El viaje seguirá activo. Podrás continuar viéndolo desde "Mis viajes".',
+      [
+        { text: 'Quedarme', style: 'cancel' },
+        { text: 'Volver al inicio', onPress: goBack },
+      ],
+    );
+  };
+
+  // Botón físico/gesto "atrás" de Android: mismo comportamiento que la flecha del header
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleVolverInicio();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   const handleSOS = () => {
     Alert.alert(
@@ -143,6 +227,9 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
 
       {/* Header flotante */}
       <View style={s.header}>
+        <TouchableOpacity style={s.backBtn} onPress={handleVolverInicio} activeOpacity={0.8}>
+          <Text style={s.backArrowTxt}>←</Text>
+        </TouchableOpacity>
         <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
         <TouchableOpacity style={s.sosBtn} onPress={handleSOS} activeOpacity={0.8}>
           <Text style={s.sosTxt}>SOS</Text>
@@ -247,22 +334,16 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
           <Text style={s.btnChatTxt}>💬  CHAT</Text>
         </TouchableOpacity>
 
-        {/* Salir al inicio */}
+        {/* Cancelar viaje */}
         <TouchableOpacity
           style={s.btnSalir}
-          onPress={() =>
-            Alert.alert(
-              'Salir del viaje',
-              '¿Seguro que quieres volver al inicio? El viaje seguirá activo en el servidor.',
-              [
-                { text: 'Quedarme', style: 'cancel' },
-                { text: 'Salir al inicio', style: 'destructive', onPress: goBack },
-              ]
-            )
-          }
+          onPress={handleCancelar}
           activeOpacity={0.7}
+          disabled={cancelando}
         >
-          <Text style={s.btnSalirTxt}>SALIR AL INICIO</Text>
+          <Text style={s.btnSalirTxt}>
+            {cancelando ? 'CANCELANDO...' : 'CANCELAR VIAJE'}
+          </Text>
         </TouchableOpacity>
 
       </View>
@@ -300,6 +381,16 @@ const s = StyleSheet.create({
     paddingBottom:     12,
   },
   logo:   { height: 28, width: 90 },
+  backBtn: {
+    width:           40,
+    height:          40,
+    borderRadius:    20,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems:      'center',
+    justifyContent:  'center',
+    ...SHADOW,
+  },
+  backArrowTxt: { color: C.black, fontSize: 20, fontWeight: '700' },
   sosBtn: {
     backgroundColor:   C.red,
     borderRadius:      20,

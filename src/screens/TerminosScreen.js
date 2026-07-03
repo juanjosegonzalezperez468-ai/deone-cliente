@@ -64,7 +64,8 @@ export default function TerminosScreen({ navigate }) {
         <Text style={s.parrafo}>
           DEONE es una plataforma tecnológica de intermediación entre usuarios que solicitan
           servicios de transporte y conductores independientes que ofrecen dichos servicios
-          en Manizales, Colombia. Al usar esta aplicación aceptas los siguientes términos.
+          en las ciudades de Colombia donde DEONE opera. Al usar esta aplicación aceptas los
+          siguientes términos.
         </Text>
 
         <Text style={s.titulo2}>1. DATOS QUE RECOLECTAMOS</Text>

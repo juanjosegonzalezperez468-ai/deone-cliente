@@ -49,7 +49,7 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
     origenLng         = -74.0817,
   } = params;
 
-  const [eta, setEta]               = useState(3);
+  const [eta, setEta]               = useState(null);
   const [conductorPos, setConductorPos] = useState(null);
   const [conductorTelefono, setConductorTelefono] = useState('');
   const [chatVisible, setChatVisible]   = useState(false);
@@ -273,7 +273,7 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
         </View>
 
         <View style={s.etaBadge}>
-          <Text style={s.etaTxt}>⏱  {eta} min</Text>
+          <Text style={s.etaTxt}>⏱  {eta ? `${eta} min` : 'En camino'}</Text>
         </View>
       </View>
 
@@ -297,7 +297,7 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
             <View style={s.plateBadge}>
               <Text style={s.plateTxt}>{conductorPlaca}</Text>
             </View>
-            <Text style={s.llegadaTxt}>{eta} min</Text>
+            <Text style={s.llegadaTxt}>{eta ? `${eta} min` : 'En camino'}</Text>
           </View>
         </View>
 

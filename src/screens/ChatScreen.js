@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  StyleSheet, StatusBar, KeyboardAvoidingView, Platform, BackHandler,
+  StyleSheet, StatusBar, KeyboardAvoidingView, Platform, BackHandler, Alert,
 } from 'react-native';
 import { getUserUuid } from '../utils/tokenStorage';
 import { chatApi } from '../api/client';
@@ -86,7 +86,11 @@ export default function ChatScreen({ params = {}, goBack, onClose }) {
         mensaje:     msg,
       });
       await fetchMensajes();
-    } catch {} finally {
+    } catch {
+      // Restaurar el mensaje al input (si no escribió otro) para reintentar
+      setTexto((prev) => prev || msg);
+      Alert.alert('No se pudo enviar', 'Revisa tu conexión e intenta de nuevo.');
+    } finally {
       setSending(false);
     }
   };

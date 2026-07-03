@@ -74,10 +74,36 @@ export default function OfertasScreen({ params, navigate, goBack }) {
 
   useEffect(() => {
     if (!serviceDbId) return;
+    let terminado = false;
     const interval = setInterval(async () => {
+      if (terminado) return;
       try {
+        // Sin filtrar por length: las ofertas expiran a los 2 min en el
+        // backend y la lista debe vaciarse cuando ya no queda ninguna.
         const { data } = await offersApi.porSolicitud(serviceDbId);
-        if (Array.isArray(data.ofertas) && data.ofertas.length > 0) setOfertasList(data.ofertas);
+        if (Array.isArray(data.ofertas)) setOfertasList(data.ofertas);
+      } catch {}
+      try {
+        const { data: servicio } = await servicesApi.obtener(serviceDbId);
+        if (servicio?.estado === 'cancelado') {
+          terminado = true;
+          clearInterval(interval);
+          Alert.alert(
+            'Solicitud cancelada',
+            'El conductor canceló la solicitud.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+          return;
+        }
+        if (servicio?.estado === 'expirado') {
+          terminado = true;
+          clearInterval(interval);
+          Alert.alert(
+            'Solicitud expirada',
+            'No se encontró conductor a tiempo. Intenta de nuevo.',
+            [{ text: 'Aceptar', onPress: goBack }]
+          );
+        }
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
@@ -105,8 +131,19 @@ export default function OfertasScreen({ params, navigate, goBack }) {
         conductorPlaca:    oferta.vehiculo?.placa                || '—',
         precioAceptado:    oferta.precio_ofrecido                || precioPropuesto,
       });
-    } catch {
+    } catch (e) {
       setLoadingId(null);
+      const detail = e?.response?.data?.detail;
+      Alert.alert(
+        'No se pudo aceptar',
+        e?.friendlyMessage
+          || (typeof detail === 'string' ? detail : 'La oferta ya no está disponible. Intenta con otra.'),
+      );
+      // Refrescar la lista de inmediato para retirar la oferta vencida
+      try {
+        const { data } = await offersApi.porSolicitud(serviceDbId);
+        if (Array.isArray(data.ofertas)) setOfertasList(data.ofertas);
+      } catch {}
     }
   };
 

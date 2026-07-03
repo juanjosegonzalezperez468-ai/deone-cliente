@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Animated, ActivityIndicator,
+  StatusBar, Animated, ActivityIndicator, BackHandler, Alert,
 } from 'react-native';
 import { ratingsApi } from '../api/client';
 
@@ -46,6 +46,15 @@ export default function ServicioFinalizadoScreen({ params, goBack }) {
     }).start();
   }, []);
 
+  // Botón físico/gesto "atrás" de Android: igual que "VOLVER AL INICIO"
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
   const handleEnviarCalificacion = async () => {
     if (loadingEnvio || enviado) return;
     setLoadingEnvio(true);
@@ -57,8 +66,11 @@ export default function ServicioFinalizadoScreen({ params, goBack }) {
         comentario:   '',
       });
       setEnviado(true);
-    } catch {
-      setEnviado(true);
+    } catch (e) {
+      Alert.alert(
+        'No se pudo enviar la calificación',
+        e?.friendlyMessage || 'Intenta de nuevo en unos segundos.',
+      );
     } finally {
       setLoadingEnvio(false);
     }

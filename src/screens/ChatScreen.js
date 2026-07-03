@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  StyleSheet, StatusBar, KeyboardAvoidingView, Platform,
+  StyleSheet, StatusBar, KeyboardAvoidingView, Platform, BackHandler,
 } from 'react-native';
 import { getUserUuid } from '../utils/tokenStorage';
 import { chatApi } from '../api/client';
@@ -63,6 +63,16 @@ export default function ChatScreen({ params = {}, goBack, onClose }) {
     });
     return () => clearInterval(interval);
   }, [serviceDbId]);
+
+  // Botón físico/gesto "atrás" de Android (la Modal de RN ya lo maneja sola,
+  // esto cubre el caso en que ChatScreen se abre como pantalla completa)
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   const handleEnviar = async () => {
     const msg = texto.trim();

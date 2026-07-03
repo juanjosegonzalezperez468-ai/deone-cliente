@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Animated, Image, Alert,
+  StatusBar, Animated, Image, Alert, BackHandler,
 } from 'react-native';
 import { SERVICES } from '../constants/services';
 import { offersApi, servicesApi } from '../api/client';
@@ -26,6 +26,35 @@ const SHADOW = {
 export default function WaitingScreen({ params, navigate, goBack }) {
   const { serviceId, serviceDbId, precioPropuesto } = params;
   const service = SERVICES.find((srv) => srv.id === serviceId);
+  const [cancelando, setCancelando] = useState(false);
+
+  const handleCancelar = async () => {
+    if (cancelando) return;
+    if (!serviceDbId) {
+      goBack();
+      return;
+    }
+    setCancelando(true);
+    try {
+      await servicesApi.cancelar(serviceDbId);
+      goBack();
+    } catch (e) {
+      setCancelando(false);
+      Alert.alert(
+        'No se pudo cancelar',
+        e?.friendlyMessage || 'Intenta de nuevo en unos segundos.',
+      );
+    }
+  };
+
+  // Botón físico/gesto "atrás" de Android: mismo efecto que el botón CANCELAR
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleCancelar();
+      return true;
+    });
+    return () => sub.remove();
+  }, [serviceDbId, cancelando]);
 
   const ringScale   = useRef(new Animated.Value(1)).current;
   const ringOpacity = useRef(new Animated.Value(0.4)).current;
@@ -155,8 +184,13 @@ export default function WaitingScreen({ params, navigate, goBack }) {
       </View>
 
       {/* Cancelar */}
-      <TouchableOpacity style={s.cancelBtn} onPress={goBack} activeOpacity={0.8}>
-        <Text style={s.cancelTxt}>CANCELAR</Text>
+      <TouchableOpacity
+        style={s.cancelBtn}
+        onPress={handleCancelar}
+        activeOpacity={0.8}
+        disabled={cancelando}
+      >
+        <Text style={s.cancelTxt}>{cancelando ? 'CANCELANDO...' : 'CANCELAR'}</Text>
       </TouchableOpacity>
     </View>
   );

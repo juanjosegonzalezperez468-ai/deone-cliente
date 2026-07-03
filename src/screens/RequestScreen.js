@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, StatusBar, TextInput, Alert, ActivityIndicator, Image,
+  StyleSheet, StatusBar, TextInput, Alert, ActivityIndicator, Image, BackHandler,
 } from 'react-native';
 import { SERVICES } from '../constants/services';
 import { servicesApi } from '../api/client';
@@ -39,6 +39,15 @@ export default function RequestScreen({ params, navigate, goBack }) {
   const ready = negotiable
     ? price.length > 0 && parseInt(price, 10) > 0
     : true;
+
+  // Botón físico/gesto "atrás" de Android: mismo efecto que la flecha del header
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!origin || !dest) return null;
 

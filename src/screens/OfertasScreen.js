@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, StatusBar, ActivityIndicator, Image,
+  StyleSheet, StatusBar, ActivityIndicator, Image, Alert, BackHandler,
 } from 'react-native';
-import { offersApi } from '../api/client';
+import { offersApi, servicesApi } from '../api/client';
 
 const C = {
   bg:     '#F8F8F8',
@@ -41,6 +41,36 @@ export default function OfertasScreen({ params, navigate, goBack }) {
 
   const [ofertasList, setOfertasList] = useState(ofertas);
   const [loadingId, setLoadingId] = useState(null);
+  const [rechazandoId, setRechazandoId] = useState(null);
+  const [cancelando, setCancelando] = useState(false);
+
+  const handleCancelar = async () => {
+    if (cancelando) return;
+    if (!serviceDbId) {
+      goBack();
+      return;
+    }
+    setCancelando(true);
+    try {
+      await servicesApi.cancelar(serviceDbId);
+      goBack();
+    } catch (e) {
+      setCancelando(false);
+      Alert.alert(
+        'No se pudo cancelar',
+        e?.friendlyMessage || 'Intenta de nuevo en unos segundos.',
+      );
+    }
+  };
+
+  // Botón físico/gesto "atrás" de Android: mismo efecto que la flecha del header (no cancela)
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!serviceDbId) return;
@@ -77,6 +107,22 @@ export default function OfertasScreen({ params, navigate, goBack }) {
       });
     } catch {
       setLoadingId(null);
+    }
+  };
+
+  const handleRechazar = async (oferta) => {
+    if (loadingId || rechazandoId) return;
+    setRechazandoId(oferta.id);
+    try {
+      await offersApi.responder(oferta.id, 'rechazar');
+      setOfertasList((prev) => prev.filter((o) => o.id !== oferta.id));
+    } catch (e) {
+      Alert.alert(
+        'No se pudo rechazar',
+        e?.friendlyMessage || 'Intenta de nuevo en unos segundos.',
+      );
+    } finally {
+      setRechazandoId(null);
     }
   };
 
@@ -143,18 +189,32 @@ export default function OfertasScreen({ params, navigate, goBack }) {
                 </View>
               </View>
 
-              {/* Botón aceptar */}
-              <TouchableOpacity
-                style={isLoading ? s.btnAceptarDis : s.btnAceptar}
-                onPress={() => handleAceptar(oferta)}
-                activeOpacity={0.85}
-                disabled={!!loadingId}
-              >
-                {isLoading
-                  ? <ActivityIndicator color={C.black} size="small" />
-                  : <Text style={s.btnAceptarTxt}>ACEPTAR</Text>
-                }
-              </TouchableOpacity>
+              {/* Botones aceptar / rechazar */}
+              <View style={s.cardActions}>
+                <TouchableOpacity
+                  style={[isLoading ? s.btnAceptarDis : s.btnAceptar, s.btnAceptarFlex]}
+                  onPress={() => handleAceptar(oferta)}
+                  activeOpacity={0.85}
+                  disabled={!!loadingId || rechazandoId === oferta.id}
+                >
+                  {isLoading
+                    ? <ActivityIndicator color={C.black} size="small" />
+                    : <Text style={s.btnAceptarTxt}>ACEPTAR</Text>
+                  }
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.btnRechazar}
+                  onPress={() => handleRechazar(oferta)}
+                  activeOpacity={0.7}
+                  disabled={!!loadingId || rechazandoId === oferta.id}
+                >
+                  {rechazandoId === oferta.id
+                    ? <ActivityIndicator color={C.red} size="small" />
+                    : <Text style={s.btnRechazarTxt}>✕</Text>
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
           );
         })}
@@ -169,8 +229,13 @@ export default function OfertasScreen({ params, navigate, goBack }) {
       </ScrollView>
 
       {/* Cancelar solicitud */}
-      <TouchableOpacity style={s.cancelWrap} onPress={goBack} activeOpacity={0.8}>
-        <Text style={s.cancelTxt}>CANCELAR SOLICITUD</Text>
+      <TouchableOpacity
+        style={s.cancelWrap}
+        onPress={handleCancelar}
+        activeOpacity={0.8}
+        disabled={cancelando}
+      >
+        <Text style={s.cancelTxt}>{cancelando ? 'CANCELANDO...' : 'CANCELAR SOLICITUD'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -252,6 +317,8 @@ const s = StyleSheet.create({
   },
   badgeContraTxt: { color: C.black, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
 
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+
   btnAceptar: {
     backgroundColor: C.yellow,
     borderRadius:    16,
@@ -264,7 +331,19 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     alignItems:      'center',
   },
-  btnAceptarTxt: { color: C.black, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+  btnAceptarFlex: { flex: 1 },
+  btnAceptarTxt:  { color: C.black, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+
+  btnRechazar: {
+    width:           48,
+    height:          48,
+    borderRadius:    16,
+    alignItems:      'center',
+    justifyContent:  'center',
+    borderWidth:     1.5,
+    borderColor:     C.red,
+  },
+  btnRechazarTxt: { color: C.red, fontSize: 16, fontWeight: '800' },
 
   emptyWrap: { paddingVertical: 48, alignItems: 'center' },
   emptyIcon: { fontSize: 44, marginBottom: 12 },

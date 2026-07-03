@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Share, Alert, Linking, Image, Modal,
+  StatusBar, Share, Alert, Linking, Image, Modal, BackHandler,
 } from 'react-native';
 import ChatScreen from './ChatScreen';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -42,6 +42,7 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
 
   const [clientPos, setClientPos]   = useState(null);
   const [chatVisible, setChatVisible] = useState(false);
+  const [cancelando, setCancelando]   = useState(false);
   const mapRef                      = useRef(null);
   const inicial                   = conductorNombre.charAt(0).toUpperCase();
 
@@ -117,6 +118,54 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
     );
   };
 
+  const handleVolverInicio = () => {
+    Alert.alert(
+      'Volver al inicio',
+      'El viaje seguirá activo. Podrás continuar viéndolo desde "Mis viajes".',
+      [
+        { text: 'Quedarme', style: 'cancel' },
+        { text: 'Volver al inicio', onPress: goBack },
+      ],
+    );
+  };
+
+  const handleCancelar = () => {
+    if (cancelando) return;
+    Alert.alert(
+      'Cancelar viaje',
+      'El conductor ya está contigo o en camino al destino. ¿Seguro que quieres cancelar el viaje?',
+      [
+        { text: 'No, continuar', style: 'cancel' },
+        {
+          text: 'Sí, cancelar',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelando(true);
+            try {
+              await servicesApi.cancelar(serviceDbId);
+              goBack();
+            } catch (e) {
+              setCancelando(false);
+              Alert.alert(
+                'No se pudo cancelar',
+                e?.friendlyMessage || 'Intenta de nuevo en unos segundos.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Botón físico/gesto "atrás" de Android
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleVolverInicio();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
   const handleCompartir = async () => {
     const msg = `Estoy viajando con DEONE 🛵\nConductor: ${conductorNombre} · ${conductorVehiculo}\nDestino: ${destDir}`;
     const url = `whatsapp://send?text=${encodeURIComponent(msg)}`;
@@ -177,16 +226,21 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
         )}
       </MapView>
 
+      {/* Header flotante */}
+      <View style={s.topRow}>
+        <TouchableOpacity style={s.backBtn} onPress={handleVolverInicio} activeOpacity={0.8}>
+          <Text style={s.backArrowTxt}>←</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.sosBtn} onPress={handleSOS} activeOpacity={0.8}>
+          <Text style={s.sosTxt}>SOS</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Badge EN VIAJE flotante */}
       <View style={s.statusBadge}>
         <View style={s.statusDot} />
         <Text style={s.statusTxt}>EN VIAJE</Text>
       </View>
-
-      {/* Botón SOS flotante */}
-      <TouchableOpacity style={s.sosBtn} onPress={handleSOS} activeOpacity={0.8}>
-        <Text style={s.sosTxt}>SOS</Text>
-      </TouchableOpacity>
 
       {/* Card flotante abajo */}
       <View style={s.bottomSheet}>
@@ -223,22 +277,16 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
           <Text style={s.btnChatTxt}>💬  CHAT</Text>
         </TouchableOpacity>
 
-        {/* Salir al inicio */}
+        {/* Cancelar viaje */}
         <TouchableOpacity
           style={s.btnSalir}
-          onPress={() =>
-            Alert.alert(
-              'Salir del viaje',
-              '¿Seguro que quieres volver al inicio? El viaje seguirá activo en el servidor.',
-              [
-                { text: 'Quedarme', style: 'cancel' },
-                { text: 'Salir al inicio', style: 'destructive', onPress: goBack },
-              ]
-            )
-          }
+          onPress={handleCancelar}
           activeOpacity={0.7}
+          disabled={cancelando}
         >
-          <Text style={s.btnSalirTxt}>SALIR AL INICIO</Text>
+          <Text style={s.btnSalirTxt}>
+            {cancelando ? 'CANCELANDO...' : 'CANCELAR VIAJE'}
+          </Text>
         </TouchableOpacity>
 
       </View>
@@ -286,10 +334,32 @@ const s = StyleSheet.create({
   },
   markerEmoji: { fontSize: 20 },
 
+  /* Header flotante */
+  topRow: {
+    position:          'absolute',
+    top:               56,
+    left:              16,
+    right:             16,
+    zIndex:            10,
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
+  },
+  backBtn: {
+    width:           40,
+    height:          40,
+    borderRadius:    20,
+    backgroundColor: C.white,
+    alignItems:      'center',
+    justifyContent:  'center',
+    ...SHADOW,
+  },
+  backArrowTxt: { color: C.black, fontSize: 20, fontWeight: '700' },
+
   /* Status badge */
   statusBadge: {
     position:          'absolute',
-    top:               56,
+    top:               104,
     left:              16,
     zIndex:            10,
     flexDirection:     'row',
@@ -311,10 +381,6 @@ const s = StyleSheet.create({
 
   /* SOS button */
   sosBtn: {
-    position:          'absolute',
-    top:               56,
-    right:             16,
-    zIndex:            10,
     backgroundColor:   C.red,
     borderRadius:      14,
     paddingHorizontal: 12,

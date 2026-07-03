@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
@@ -29,6 +29,73 @@ export default function OTPScreen({ params, navigate }) {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [confirmation, setConfirmation] = useState(params.confirmation);
+  const sesionProcesada = useRef(false);
+
+  const aMs = (v) => {
+    if (typeof v === 'number') return v;
+    const t = Date.parse(v || '');
+    return Number.isNaN(t) ? null : t;
+  };
+
+  // Sin metadata confiable se asume nuevo: un usuario existente que pase por
+  // Registro es inofensivo (el backend ignora el nombre), lo contrario no.
+  const esUsuarioNuevo = (user) => {
+    const creado = aMs(user.metadata?.creationTime);
+    const ultimo = aMs(user.metadata?.lastSignInTime);
+    if (creado == null || ultimo == null) return true;
+    return ultimo - creado < 2 * 60 * 1000;
+  };
+
+  const continuarSesion = async (user, esNuevo) => {
+    if (sesionProcesada.current) return;
+    sesionProcesada.current = true;
+    setLoading(true);
+    let idToken;
+    try {
+      idToken = await user.getIdToken();
+      await storePhone(params.telefono);
+    } catch {
+      // Falla de red: liberar el guard para que pueda reintentar
+      sesionProcesada.current = false;
+      setLoading(false);
+      Alert.alert('Sin conexión', 'No se pudo completar el inicio de sesión. Revisa tu internet e intenta de nuevo.');
+      return;
+    }
+    try {
+      if (esNuevo ?? esUsuarioNuevo(user)) {
+        navigate('Registro', { telefono: params.telefono, idToken });
+        return;
+      }
+      try {
+        const { data } = await authApi.registrar(params.telefono, 'cliente', 'usuario', idToken);
+        await storeBackendToken(data.token);
+        await storeUserUuid(data.usuario.id);
+        registrarNotificacionesPush(data.usuario.id);
+        if (!data.usuario.terminos_aceptados) {
+          navigate('Terminos');
+        } else {
+          navigate('Home');
+        }
+      } catch {
+        navigate('Registro', { telefono: params.telefono, idToken });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // En Android, Google Play Services puede leer el SMS y Firebase inicia
+  // sesión solo (verificación automática), consumiendo la sesión: el código
+  // tecleado a mano siempre fallaría. Al detectar la sesión se continúa
+  // el flujo sin exigir el código.
+  useEffect(() => {
+    const unsubscribe = auth().onAuthStateChanged((user) => {
+      if (user && user.phoneNumber === '+57' + params.telefono) {
+        continuarSesion(user);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const ref0 = useRef();
   const ref1 = useRef();
@@ -76,26 +143,16 @@ export default function OTPScreen({ params, navigate }) {
     setLoading(true);
     try {
       const result = await confirmation.confirm(code);
-      const idToken = await result.user.getIdToken();
-      await storePhone(params.telefono);
-      if (result.additionalUserInfo?.isNewUser) {
-        navigate('Registro', { telefono: params.telefono, idToken });
-      } else {
-        try {
-          const { data } = await authApi.registrar(params.telefono, 'cliente', 'usuario', idToken);
-          await storeBackendToken(data.token);
-          await storeUserUuid(data.usuario.id);
-          registrarNotificacionesPush(data.usuario.id);
-          if (!data.usuario.terminos_aceptados) {
-            navigate('Terminos');
-          } else {
-            navigate('Home');
-          }
-        } catch {
-          navigate('Registro', { telefono: params.telefono, idToken });
-        }
-      }
+      await continuarSesion(result.user, !!result.additionalUserInfo?.isNewUser);
     } catch (e) {
+      // Si la verificación automática ya inició sesión, confirm() falla
+      // aunque el código sea correcto: la sesión ya se consumió. Se
+      // continúa con el usuario autenticado en vez de mostrar error.
+      const user = auth().currentUser;
+      if (user && user.phoneNumber === '+57' + params.telefono) {
+        await continuarSesion(user);
+        return;
+      }
       Alert.alert(...mensajeErrorOtp(e));
     } finally {
       setLoading(false);

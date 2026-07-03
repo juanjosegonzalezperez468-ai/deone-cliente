@@ -9,9 +9,26 @@ import { authApi } from '../api/client';
 import { storeBackendToken, storePhone, storeUserUuid } from '../utils/tokenStorage';
 import { registrarNotificacionesPush } from '../utils/notifications';
 
+function mensajeErrorOtp(e) {
+  switch (e?.code) {
+    case 'auth/invalid-verification-code':
+      return ['Código incorrecto', 'El código no coincide. Revisa los 6 dígitos e intenta de nuevo.'];
+    case 'auth/code-expired':
+    case 'auth/session-expired':
+      return ['Código vencido', 'Este código ya expiró. Toca "Reenviar código" para recibir uno nuevo.'];
+    case 'auth/too-many-requests':
+      return ['Demasiados intentos', 'Espera unos minutos antes de volver a intentar.'];
+    case 'auth/network-request-failed':
+      return ['Sin conexión', 'Revisa tu conexión a internet e intenta de nuevo.'];
+    default:
+      return ['Código inválido', 'El código ingresado no es correcto. Intenta de nuevo.'];
+  }
+}
+
 export default function OTPScreen({ params, navigate }) {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [confirmation, setConfirmation] = useState(params.confirmation);
 
   const ref0 = useRef();
   const ref1 = useRef();
@@ -58,7 +75,7 @@ export default function OTPScreen({ params, navigate }) {
     }
     setLoading(true);
     try {
-      const result = await params.confirmation.confirm(code);
+      const result = await confirmation.confirm(code);
       const idToken = await result.user.getIdToken();
       await storePhone(params.telefono);
       if (result.additionalUserInfo?.isNewUser) {
@@ -78,8 +95,8 @@ export default function OTPScreen({ params, navigate }) {
           navigate('Registro', { telefono: params.telefono, idToken });
         }
       }
-    } catch {
-      Alert.alert('Código inválido', 'El código ingresado no es correcto. Intenta de nuevo.');
+    } catch (e) {
+      Alert.alert(...mensajeErrorOtp(e));
     } finally {
       setLoading(false);
     }
@@ -87,7 +104,9 @@ export default function OTPScreen({ params, navigate }) {
 
   const reenviar = async () => {
     try {
-      await auth().signInWithPhoneNumber('+57' + params.telefono);
+      const nueva = await auth().signInWithPhoneNumber('+57' + params.telefono);
+      setConfirmation(nueva);
+      setDigits(['', '', '', '', '', '']);
       Alert.alert('Código enviado', 'Te enviamos un nuevo código al mismo número.');
     } catch {
       Alert.alert('Error', 'No se pudo reenviar el código. Intenta más tarde.');

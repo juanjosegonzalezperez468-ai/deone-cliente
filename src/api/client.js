@@ -35,7 +35,7 @@ api.interceptors.response.use(
           const idToken = await user.getIdToken(true);
           const { data } = await axios.post(
             `${API_URL}/auth/verificar-otp`,
-            { telefono: phone, token: idToken, tipo: 'cliente', nombre: 'usuario' },
+            { telefono: phone, token: idToken, tipo: 'cliente' },
             { headers: { 'Content-Type': 'application/json' } },
           );
           await storeBackendToken(data.token);
@@ -64,12 +64,21 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  enviarOtp: (telefono) => api.post('/auth/enviar-otp', { telefono }),
   verificarOtp: (telefono, codigo) =>
     api.post('/auth/verificar-otp', { telefono, codigo }),
   registrar: (telefono, tipo, nombre, idToken) =>
-    api.post('/auth/verificar-otp', { telefono, token: idToken, tipo, nombre }),
+    api.post('/auth/verificar-otp', {
+      telefono,
+      token: idToken,
+      tipo,
+      ...(nombre ? { nombre } : {}),
+    }),
   perfil: (uid) => api.get(`/auth/perfil/${uid}`),
+  subirFotoPerfil: (uid, formData) =>
+    api.post(`/auth/perfil/${uid}/foto`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    }),
   registrarFcmToken: (uid, fcm_token) => api.patch(`/auth/perfil/${uid}/fcm-token`, { fcm_token }),
   aceptarTerminos: (uid) => api.patch(`/auth/perfil/${uid}/terminos`),
 };

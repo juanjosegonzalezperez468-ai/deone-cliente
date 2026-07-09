@@ -38,7 +38,8 @@ export default function OTPScreen({ params, navigate }) {
   };
 
   // Sin metadata confiable se asume nuevo: un usuario existente que pase por
-  // Registro es inofensivo (el backend ignora el nombre), lo contrario no.
+  // Registro es inofensivo (el backend solo completa el nombre si estaba
+  // vacío o era un placeholder), lo contrario no.
   const esUsuarioNuevo = (user) => {
     const creado = aMs(user.metadata?.creationTime);
     const ultimo = aMs(user.metadata?.lastSignInTime);
@@ -67,7 +68,13 @@ export default function OTPScreen({ params, navigate }) {
         return;
       }
       try {
-        const { data } = await authApi.registrar(params.telefono, 'cliente', 'usuario', idToken);
+        const { data } = await authApi.registrar(params.telefono, 'cliente', null, idToken);
+        // El backend creó el perfil recién (sin nombre): mandar al registro
+        // para capturar el nombre real antes de continuar.
+        if (data.es_nuevo) {
+          navigate('Registro', { telefono: params.telefono, idToken });
+          return;
+        }
         await storeBackendToken(data.token);
         await storeUserUuid(data.usuario.id);
         registrarNotificacionesPush(data.usuario.id);

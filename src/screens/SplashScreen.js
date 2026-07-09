@@ -38,7 +38,7 @@ export default function SplashScreen({ navigate }) {
           const idToken = await user.getIdToken();
           const { data } = await axios.post(
             `${API_URL}/auth/verificar-otp`,
-            { telefono: phone, token: idToken, tipo: 'cliente', nombre: 'usuario' },
+            { telefono: phone, token: idToken, tipo: 'cliente' },
             { headers: { 'Content-Type': 'application/json' } },
           );
           jwt  = data.token;

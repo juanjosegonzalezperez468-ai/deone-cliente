@@ -95,16 +95,18 @@ export default function RequestScreen({ params, navigate, goBack }) {
         url:    err.config?.url,
       }));
       let msg;
+      let titulo = 'Error de red';
       if (err.code === 'ECONNABORTED') {
         msg = 'El servidor tardó demasiado en responder. Intenta de nuevo.';
       } else if (!err.response) {
         msg = `No se pudo conectar al servidor (${err.message}). Verifica tu conexión o intenta más tarde.`;
       } else {
+        if (err.response.status === 403) titulo = 'Servicio no habilitado';
         msg = err.response?.data?.detail
           || err.response?.data?.message
           || `Error ${err.response.status}: ${err.message}`;
       }
-      Alert.alert('Error de red', msg);
+      Alert.alert(titulo, typeof msg === 'string' ? msg : 'No se pudo crear la solicitud.');
     } finally {
       setLoading(false);
     }

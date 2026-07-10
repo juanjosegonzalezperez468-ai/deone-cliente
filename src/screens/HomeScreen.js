@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
@@ -23,21 +23,16 @@ const C = {
   grayBg:     '#F5F5F5',
 };
 
-const MANIZALES = { lat: 5.0703, lng: -75.5138 };
-
 const { width: SW } = Dimensions.get('window');
 const CARD_W = Math.floor((SW - 40 - 24) / 2);
 
 const fmtCOP = (n) =>
   Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
-const placesQuery = {
-  key:          GOOGLE_MAPS_KEY,
-  language:     'es',
-  components:   'country:co',
-  location:     `${MANIZALES.lat},${MANIZALES.lng}`,
-  radius:       30000,
-  strictbounds: true,
+const PLACES_QUERY_BASE = {
+  key:        GOOGLE_MAPS_KEY,
+  language:   'es',
+  components: 'country:co',
 };
 
 const placesStyles = {
@@ -165,6 +160,8 @@ export default function HomeScreen({ navigate }) {
   const [origin, setOrigin]           = useState({ text: '', lat: null, lng: null });
   const [dest, setDest]               = useState({ text: '', lat: null, lng: null });
   const [gpsLoading, setGpsLoading]   = useState(false);
+  const [deviceLoc, setDeviceLoc]     = useState(null);
+  const [ciudad, setCiudad]           = useState('');
   const [fareInfo, setFareInfo]       = useState(null);
   const [fareLoading, setFareLoading] = useState(false);
   const [fareRatio, setFareRatio]     = useState(0);
@@ -179,6 +176,32 @@ export default function HomeScreen({ navigate }) {
   useEffect(() => {
     getUserUuid().then(id => { if (id) uuidRef.current = id; });
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setDeviceLoc(loc.coords);
+        const [place] = await Location.reverseGeocodeAsync(loc.coords);
+        setCiudad(place?.city || place?.subregion || '');
+      } catch {}
+    })();
+  }, []);
+
+  // Sin GPS no se sesga la búsqueda: mejor resultados de todo el país que
+  // resultados de una ciudad que puede no ser la del usuario.
+  const placesQuery = useMemo(() => (
+    deviceLoc
+      ? {
+          ...PLACES_QUERY_BASE,
+          location:     `${deviceLoc.latitude},${deviceLoc.longitude}`,
+          radius:       30000,
+          strictbounds: true,
+        }
+      : PLACES_QUERY_BASE
+  ), [deviceLoc]);
 
   useEffect(() => {
     if (activeTab === 'viajes' || activeTab === 'mensajes') fetchHistorial();
@@ -257,7 +280,9 @@ export default function HomeScreen({ navigate }) {
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = loc.coords;
+      setDeviceLoc(loc.coords);
       const [addr] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (addr?.city || addr?.subregion) setCiudad(addr.city || addr.subregion);
       const text = [addr.street, addr.streetNumber, addr.city].filter(Boolean).join(' ');
       originRef.current?.setAddressText(text);
       setOrigin({ text: text || 'Ubicación actual', lat: latitude, lng: longitude });
@@ -301,7 +326,7 @@ export default function HomeScreen({ navigate }) {
             style={s.logo}
             resizeMode="contain"
           />
-          <Text style={s.city}>Manizales 📍</Text>
+          {!!ciudad && <Text style={s.city}>{ciudad} 📍</Text>}
         </View>
 
         {/* Título + subtítulo */}

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
-  Dimensions, Image, PanResponder,
+  Dimensions, Image,
 } from 'react-native';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from 'expo-location';
@@ -80,60 +80,9 @@ function ServiceCard({ service, selected, onPress, cardWidth }) {
   );
 }
 
-function FareSliderBar({ ratio, setRatio }) {
-  const trackW     = useRef(300);
-  const startRatio = useRef(0);
-  const [displayW, setDisplayW] = useState(300);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const pos = Math.max(0, Math.min(1, evt.nativeEvent.locationX / trackW.current));
-        const r = (pos - 0.5) * 0.4;
-        startRatio.current = r;
-        setRatio(r);
-      },
-      onPanResponderMove: (_, gs) => {
-        const r = Math.max(-0.2, Math.min(0.2,
-          startRatio.current + (gs.dx / trackW.current) * 0.4));
-        setRatio(r);
-      },
-    })
-  ).current;
-
-  const thumbPct = (ratio + 0.2) / 0.4;
-  const thumbPx  = thumbPct * displayW;
-  const TR = 11;
-
-  return (
-    <View
-      onLayout={(e) => {
-        trackW.current = e.nativeEvent.layout.width;
-        setDisplayW(e.nativeEvent.layout.width);
-      }}
-      style={s.sliderWrap}
-      {...panResponder.panHandlers}
-    >
-      <View style={s.sliderRail} />
-      <View style={{
-        position: 'absolute', left: 0, top: 20,
-        height: 4, width: thumbPx,
-        backgroundColor: C.yellow, borderRadius: 2,
-      }} />
-      <View style={{
-        position: 'absolute',
-        top: 11,
-        left: Math.max(0, Math.min(displayW - TR * 2, thumbPx - TR)),
-        width: TR * 2, height: TR * 2, borderRadius: TR,
-        backgroundColor: C.yellow,
-        borderWidth: 3, borderColor: C.white,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
-      }} />
-    </View>
-  );
-}
+// Ajuste de tarifa por botones: el cliente sube su oferta hasta +20% o la
+// baja como máximo −5% (piso que protege el mínimo por km de moto/carro).
+const FARE_STEPS = [-0.05, 0, 0.05, 0.10, 0.15, 0.20];
 
 const ESTADO_LABELS = {
   pendiente:   'Buscando conductor',
@@ -435,10 +384,20 @@ export default function HomeScreen({ navigate }) {
                   <Text style={s.fareBadgeTxt}>{pctLabel}</Text>
                 </View>
               </View>
-              <FareSliderBar ratio={fareRatio} setRatio={setFareRatio} />
-              <View style={s.fareSliderLabels}>
-                <Text style={s.fareSliderLbl}>−20%</Text>
-                <Text style={s.fareSliderLbl}>+20%</Text>
+              <Text style={s.fareAjusteLbl}>Ajusta tu oferta</Text>
+              <View style={s.fareBtnRow}>
+                {FARE_STEPS.map((step) => (
+                  <TouchableOpacity
+                    key={step}
+                    style={fareRatio === step ? s.fareBtnOn : s.fareBtnOff}
+                    onPress={() => setFareRatio(step)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={fareRatio === step ? s.fareBtnTxtOn : s.fareBtnTxtOff}>
+                      {step === 0 ? 'Base' : `${step > 0 ? '+' : ''}${Math.round(step * 100)}%`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           ) : null
@@ -689,11 +648,12 @@ const s = StyleSheet.create({
   fareBadge:{ backgroundColor: C.yellowLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   fareBadgeTxt: { color: C.black, fontSize: 13, fontWeight: '700' },
 
-  sliderWrap: { height: 44, justifyContent: 'center', width: '100%' },
-  sliderRail: { height: 4, backgroundColor: C.grayBorder, borderRadius: 2 },
-
-  fareSliderLabels: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 6 },
-  fareSliderLbl:    { color: C.grayLight, fontSize: 11 },
+  fareAjusteLbl: { color: C.grayLight, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: 14, marginBottom: 8 },
+  fareBtnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fareBtnOff: { borderWidth: 1.5, borderColor: C.grayBorder, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: C.white },
+  fareBtnOn:  { borderWidth: 1.5, borderColor: C.yellow, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: C.yellow },
+  fareBtnTxtOff: { color: C.grayLight, fontSize: 14, fontWeight: '700' },
+  fareBtnTxtOn:  { color: C.black, fontSize: 14, fontWeight: '700' },
 
   /* Botón */
   btnOn:     { backgroundColor: C.yellow, borderRadius: 14, paddingVertical: 18, alignItems: 'center', marginBottom: 8 },

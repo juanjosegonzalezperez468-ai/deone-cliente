@@ -89,6 +89,12 @@ export const servicesApi = {
   obtener:  (serviceId)  => api.get(`/services/${serviceId}`),
   historial:(clienteId)  => api.get(`/services/cliente/${clienteId}`),
   cancelar: (serviceId)  => api.patch(`/services/${serviceId}/estado`, { estado: 'cancelado' }),
+  // Sube la foto de la tarjeta de propiedad del vehículo a remolcar (grúa).
+  // Devuelve { path } que se envía como tarjeta_propiedad_path al crear.
+  subirManifiesto: (formData) =>
+    api.post('/services/manifiesto/subir', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 export const offersApi = {

@@ -3,9 +3,27 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, StatusBar, TextInput, Alert, ActivityIndicator, Image, BackHandler,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SERVICES } from '../constants/services';
 import { servicesApi } from '../api/client';
 import { getUserUuid } from '../utils/tokenStorage';
+
+// Opciones de contexto para grúa y acarreo (deben coincidir con el backend)
+const GRUA_TIPOS = [
+  { id: 'motocarro', label: 'Motocarro' },
+  { id: 'camioneta', label: 'Camioneta' },
+  { id: 'camabaja',  label: 'Camabaja' },
+];
+const GRUA_ZONAS = [
+  { id: 'urbana',         label: 'Urbana' },
+  { id: 'intermunicipal', label: 'Intermunicipal' },
+];
+const ACARREO_TIPOS = [
+  { id: 'motocarro', label: 'Motocarro' },
+  { id: 'camioneta', label: 'Camioneta' },
+  { id: 'turbo',     label: 'Turbo' },
+  { id: 'nh',        label: 'NH' },
+];
 
 const C = {
   white: '#FFFFFF',
@@ -32,13 +50,57 @@ export default function RequestScreen({ params, navigate, goBack }) {
   const { serviceId, origin, dest, fareInfo } = params;
   const service    = SERVICES.find((srv) => srv.id === serviceId);
   const negotiable = fareInfo === null;
+  const esGrua     = serviceId === 'grua';
+  const esAcarreo  = serviceId === 'acarreo';
 
   const [price, setPrice]     = useState('');
   const [loading, setLoading] = useState(false);
 
-  const ready = negotiable
-    ? price.length > 0 && parseInt(price, 10) > 0
-    : true;
+  // Contexto de grúa / acarreo
+  const [gruaTipo, setGruaTipo]       = useState(null);
+  const [gruaZona, setGruaZona]       = useState(null);
+  const [tarjetaPath, setTarjetaPath] = useState(null);   // path en storage (backend)
+  const [tarjetaPrev, setTarjetaPrev] = useState(null);   // uri local para previsualizar
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [acarreoTipo, setAcarreoTipo] = useState(null);
+  const [peso, setPeso]               = useState('');
+  const [ayudante, setAyudante]       = useState(false);
+
+  // Requisitos mínimos para poder buscar conductor
+  const detallesOk =
+    esGrua    ? (gruaTipo && gruaZona) :
+    esAcarreo ? !!acarreoTipo :
+    true;
+  const precioOk = negotiable ? (price.length > 0 && parseInt(price, 10) > 0) : true;
+  const ready = detallesOk && precioOk;
+
+  const subirTarjeta = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permiso denegado', 'Necesitamos acceso a tus fotos para subir la tarjeta de propiedad.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      const uri = result.assets[0].uri;
+      setSubiendoFoto(true);
+      const clienteId = await getUserUuid();
+      const formData = new FormData();
+      formData.append('cliente_id', clienteId);
+      formData.append('archivo', { uri, type: 'image/jpeg', name: 'tarjeta.jpg' });
+      const { data } = await servicesApi.subirManifiesto(formData);
+      setTarjetaPath(data.path);
+      setTarjetaPrev(uri);
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo subir la foto. Puedes continuar sin ella y entregarla al conductor.');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
 
   // Botón físico/gesto "atrás" de Android: mismo efecto que la flecha del header
   useEffect(() => {
@@ -73,6 +135,16 @@ export default function RequestScreen({ params, navigate, goBack }) {
         destino_lng:       dest.lng,
         destino_direccion: dest.text,
       };
+      if (esGrua) {
+        body.grua_tipo = gruaTipo;
+        body.grua_zona = gruaZona;
+        if (tarjetaPath) body.tarjeta_propiedad_path = tarjetaPath;
+      }
+      if (esAcarreo) {
+        body.acarreo_tipo = acarreoTipo;
+        body.necesita_ayudante = ayudante;
+        if (peso) body.peso_estimado_kg = parseInt(peso, 10);
+      }
 
       const { data } = await servicesApi.crear(body);
       navigate('Waiting', {
@@ -164,6 +236,100 @@ export default function RequestScreen({ params, navigate, goBack }) {
             </View>
           </View>
         </View>
+
+        {/* Detalles de grúa */}
+        {esGrua && (
+          <>
+            <Text style={s.section}>TIPO DE GRÚA</Text>
+            <View style={s.chipsRow}>
+              {GRUA_TIPOS.map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  style={gruaTipo === t.id ? s.chipOn : s.chipOff}
+                  onPress={() => setGruaTipo(t.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={gruaTipo === t.id ? s.chipTxtOn : s.chipTxtOff}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.section}>ZONA</Text>
+            <View style={s.chipsRow}>
+              {GRUA_ZONAS.map((z) => (
+                <TouchableOpacity
+                  key={z.id}
+                  style={gruaZona === z.id ? s.chipOn : s.chipOff}
+                  onPress={() => setGruaZona(z.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={gruaZona === z.id ? s.chipTxtOn : s.chipTxtOff}>{z.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.section}>TARJETA DE PROPIEDAD (OPCIONAL)</Text>
+            <TouchableOpacity style={s.uploadBox} onPress={subirTarjeta} activeOpacity={0.8} disabled={subiendoFoto}>
+              {subiendoFoto ? (
+                <ActivityIndicator color={C.black} size="small" />
+              ) : tarjetaPrev ? (
+                <View style={s.uploadDone}>
+                  <Image source={{ uri: tarjetaPrev }} style={s.uploadThumb} />
+                  <Text style={s.uploadDoneTxt}>Foto cargada · toca para cambiar</Text>
+                </View>
+              ) : (
+                <Text style={s.uploadTxt}>📄  Subir foto de la tarjeta de propiedad</Text>
+              )}
+            </TouchableOpacity>
+            <Text style={s.priceHint}>
+              Requerida para el manifiesto de carga. Si no la tienes a mano, puedes continuar y entregarla al conductor.
+            </Text>
+          </>
+        )}
+
+        {/* Detalles de acarreo */}
+        {esAcarreo && (
+          <>
+            <Text style={s.section}>TIPO DE VEHÍCULO</Text>
+            <View style={s.chipsRow}>
+              {ACARREO_TIPOS.map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  style={acarreoTipo === t.id ? s.chipOn : s.chipOff}
+                  onPress={() => setAcarreoTipo(t.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={acarreoTipo === t.id ? s.chipTxtOn : s.chipTxtOff}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.section}>PESO APROXIMADO (OPCIONAL)</Text>
+            <View style={[s.priceCard, SHADOW]}>
+              <TextInput
+                style={s.priceInput}
+                placeholder="0"
+                placeholderTextColor={C.grayBorder}
+                value={peso}
+                onChangeText={(v) => setPeso(v.replace(/[^0-9]/g, ''))}
+                keyboardType="numeric"
+                maxLength={6}
+              />
+              <Text style={s.cop}>KG</Text>
+            </View>
+
+            <TouchableOpacity
+              style={s.checkRow}
+              onPress={() => setAyudante((v) => !v)}
+              activeOpacity={0.8}
+            >
+              <View style={ayudante ? s.checkBoxOn : s.checkBoxOff}>
+                {ayudante && <Text style={s.checkMark}>✓</Text>}
+              </View>
+              <Text style={s.checkLabel}>Necesito ayudante para cargar</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Precio — tarifa estimada para servicios con tarifa */}
         {negotiable ? (
@@ -321,4 +487,25 @@ const s = StyleSheet.create({
   btnOff:    { backgroundColor: C.grayBg, borderRadius: 18, paddingVertical: 18, alignItems: 'center' },
   btnTxtOn:  { color: C.black,     fontSize: 17, fontWeight: '700', letterSpacing: 1 },
   btnTxtOff: { color: C.grayLight, fontSize: 17, fontWeight: '700', letterSpacing: 1 },
+
+  // Chips de selección (tipo/zona)
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
+  chipOn:  { backgroundColor: C.yellow, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1.5, borderColor: C.yellow },
+  chipOff: { backgroundColor: C.white, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1.5, borderColor: C.grayBorder },
+  chipTxtOn:  { color: C.black, fontSize: 14, fontWeight: '700' },
+  chipTxtOff: { color: C.grayLight, fontSize: 14, fontWeight: '600' },
+
+  // Subida de tarjeta
+  uploadBox: { borderWidth: 1.5, borderColor: C.grayBorder, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8, minHeight: 60 },
+  uploadTxt: { color: C.grayLight, fontSize: 14, fontWeight: '600' },
+  uploadDone: { flexDirection: 'row', alignItems: 'center' },
+  uploadThumb: { width: 40, height: 40, borderRadius: 8, marginRight: 12 },
+  uploadDoneTxt: { color: C.black, fontSize: 13, fontWeight: '600' },
+
+  // Checkbox ayudante
+  checkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, marginTop: 4 },
+  checkBoxOn:  { width: 24, height: 24, borderRadius: 6, backgroundColor: C.yellow, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  checkBoxOff: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: C.grayBorder, marginRight: 12 },
+  checkMark: { color: C.black, fontSize: 15, fontWeight: '800' },
+  checkLabel: { color: C.black, fontSize: 15, fontWeight: '500' },
 });

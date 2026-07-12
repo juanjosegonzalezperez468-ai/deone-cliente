@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { SERVICES } from '../constants/services';
 import { GOOGLE_MAPS_KEY } from '../constants/config';
 import { isNegotiable, calcFare, getDirections } from '../utils/fare';
@@ -121,6 +122,7 @@ export default function HomeScreen({ navigate }) {
   const [historial,        setHistorial]        = useState([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [perfil,           setPerfil]           = useState(null);
+  const [subiendoFoto,     setSubiendoFoto]     = useState(false);
 
   useEffect(() => {
     getUserUuid().then(id => { if (id) uuidRef.current = id; });
@@ -173,6 +175,68 @@ export default function HomeScreen({ navigate }) {
       const { data } = await authApi.perfil(uuidRef.current);
       setPerfil(data);
     } catch {}
+  };
+
+  const subirNuevaFoto = async (uri) => {
+    setSubiendoFoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('archivo', {
+        uri,
+        name: 'foto_perfil.jpg',
+        type: 'image/jpeg',
+      });
+      const { data } = await authApi.subirFotoPerfil(uuidRef.current, formData);
+      // El path en Storage es fijo, así que la URL no cambia entre fotos:
+      // se agrega un timestamp para que la <Image> no muestre la versión en caché.
+      const nuevaUrl = data?.foto_url ? `${data.foto_url}${data.foto_url.includes('?') ? '&' : '?'}v=${Date.now()}` : uri;
+      setPerfil((prev) => ({ ...(prev || {}), foto_url: nuevaUrl }));
+    } catch {
+      Alert.alert('No se pudo subir la foto', 'Revisa tu conexión e intenta de nuevo.');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  const cambiarFoto = () => {
+    if (subiendoFoto) return;
+    Alert.alert('Foto de perfil', 'Tu foto la verá el conductor que acepte tu viaje.', [
+      {
+        text: 'Tomar foto',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permiso denegado', 'Necesitamos acceso a tu cámara para tomar la foto.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+            allowsEditing: true,
+            aspect: [1, 1],
+          });
+          if (!result.canceled) subirNuevaFoto(result.assets[0].uri);
+        },
+      },
+      {
+        text: 'Elegir de galería',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería para seleccionar la foto.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+            allowsEditing: true,
+            aspect: [1, 1],
+          });
+          if (!result.canceled) subirNuevaFoto(result.assets[0].uri);
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
   };
 
   const handleLogout = async () => {
@@ -519,13 +583,31 @@ export default function HomeScreen({ navigate }) {
         <ScrollView style={s.scroll} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
           <Text style={s.tabTitle}>Mi cuenta</Text>
           <View style={s.avatarWrap}>
-            <View style={s.avatar}>
-              <Text style={s.avatarTxt}>
-                {(perfil?.nombre || 'U').charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            <TouchableOpacity onPress={cambiarFoto} activeOpacity={0.8} disabled={subiendoFoto}>
+              {subiendoFoto ? (
+                <View style={s.avatar}>
+                  <ActivityIndicator color={C.black} />
+                </View>
+              ) : perfil?.foto_url ? (
+                <Image source={{ uri: perfil.foto_url }} style={s.avatarFoto} />
+              ) : (
+                <View style={s.avatar}>
+                  <Text style={s.avatarTxt}>
+                    {(perfil?.nombre || 'U').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={s.avatarCamBadge}>
+                <Text style={s.avatarCamIcon}>📷</Text>
+              </View>
+            </TouchableOpacity>
             <Text style={s.cuentaNombre}>{perfil?.nombre || 'Usuario'}</Text>
             {perfil?.telefono ? <Text style={s.cuentaPhone}>{perfil.telefono}</Text> : null}
+            <TouchableOpacity onPress={cambiarFoto} activeOpacity={0.7} disabled={subiendoFoto}>
+              <Text style={s.cambiarFotoTxt}>
+                {subiendoFoto ? 'Subiendo foto…' : 'Cambiar foto de perfil'}
+              </Text>
+            </TouchableOpacity>
           </View>
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
             <Text style={s.logoutTxt}>CERRAR SESIÓN</Text>
@@ -728,6 +810,21 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   avatarTxt:    { color: C.black, fontSize: 36, fontWeight: '800' },
+  avatarFoto: {
+    width: 80, height: 80, borderRadius: 40,
+    marginBottom: 12,
+    backgroundColor: C.grayBg,
+  },
+  avatarCamBadge: {
+    position: 'absolute',
+    right: -2, bottom: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: C.white,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.grayBorder,
+  },
+  avatarCamIcon:   { fontSize: 14 },
+  cambiarFotoTxt:  { color: C.grayLight, fontSize: 13, marginTop: 10, textDecorationLine: 'underline' },
   cuentaNombre: { color: C.black,     fontSize: 22, fontWeight: '700', marginBottom: 4 },
   cuentaPhone:  { color: C.grayLight, fontSize: 15 },
 

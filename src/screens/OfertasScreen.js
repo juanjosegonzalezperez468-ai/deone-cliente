@@ -126,6 +126,7 @@ export default function OfertasScreen({ params, navigate, goBack }) {
         ofertaId:          oferta.id,
         conductorId:       oferta.conductor_id                  || '',
         conductorNombre:   oferta.users?.nombre                 || 'Conductor',
+        conductorFoto:     oferta.users?.foto_url               || null,
         conductorRating:   oferta.users?.rating                 || 4.8,
         conductorVehiculo: oferta.vehiculo?.tipo_servicio        || 'Moto',
         conductorPlaca:    oferta.vehiculo?.placa                || '—',
@@ -196,15 +197,20 @@ export default function OfertasScreen({ params, navigate, goBack }) {
           const precio    = oferta.precio_ofrecido              || precioPropuesto;
           const esExacto  = precio <= precioPropuesto;
           const inicial   = nombre.charAt(0).toUpperCase();
+          const foto      = oferta.users?.foto_url              || null;
           const isLoading = loadingId === oferta.id;
 
           return (
             <View key={oferta.id} style={s.card}>
               {/* Info conductor */}
               <View style={s.cardTop}>
-                <View style={s.avatar}>
-                  <Text style={s.avatarTxt}>{inicial}</Text>
-                </View>
+                {foto ? (
+                  <Image source={{ uri: foto }} style={s.avatarFoto} />
+                ) : (
+                  <View style={s.avatar}>
+                    <Text style={s.avatarTxt}>{inicial}</Text>
+                  </View>
+                )}
                 <View style={s.conductorInfo}>
                   <Text style={s.nombre}>{nombre}</Text>
                   <View style={s.ratingRow}>
@@ -325,6 +331,14 @@ const s = StyleSheet.create({
     flexShrink:      0,
   },
   avatarTxt:     { color: C.black, fontSize: 22, fontWeight: '800' },
+  avatarFoto: {
+    width:           52,
+    height:          52,
+    borderRadius:    26,
+    marginRight:     12,
+    flexShrink:      0,
+    backgroundColor: C.border,
+  },
   conductorInfo: { flex: 1 },
   nombre:        { color: C.black, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   ratingRow:     { flexDirection: 'row', alignItems: 'center' },

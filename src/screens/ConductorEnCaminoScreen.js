@@ -37,6 +37,7 @@ const ESTADOS_VIAJE = ['en_servicio', 'completado'];
 export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
   const {
     conductorNombre   = 'Conductor',
+    conductorFoto     = null,
     conductorRating   = 4.8,
     conductorVehiculo = 'Moto',
     conductorPlaca    = '—',
@@ -282,9 +283,13 @@ export default function ConductorEnCaminoScreen({ params, navigate, goBack }) {
 
         {/* Card conductor */}
         <View style={s.driverCard}>
-          <View style={s.avatar}>
-            <Text style={s.avatarTxt}>{inicial}</Text>
-          </View>
+          {conductorFoto ? (
+            <Image source={{ uri: conductorFoto }} style={s.avatarFoto} />
+          ) : (
+            <View style={s.avatar}>
+              <Text style={s.avatarTxt}>{inicial}</Text>
+            </View>
+          )}
           <View style={s.driverInfo}>
             <Text style={s.driverName}>{conductorNombre}</Text>
             <View style={s.ratingRow}>
@@ -482,6 +487,13 @@ const s = StyleSheet.create({
     marginRight:     12,
   },
   avatarTxt:   { color: C.black, fontSize: 22, fontWeight: '800' },
+  avatarFoto: {
+    width:           52,
+    height:          52,
+    borderRadius:    26,
+    marginRight:     12,
+    backgroundColor: '#EEEEEE',
+  },
   driverInfo:  { flex: 1 },
   driverName:  { color: C.black, fontSize: 16, fontWeight: '700', marginBottom: 3 },
   ratingRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },

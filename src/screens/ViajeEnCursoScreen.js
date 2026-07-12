@@ -31,6 +31,7 @@ const ESTADOS_FINALIZADO = ['completado'];
 export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
   const {
     conductorNombre   = 'Conductor',
+    conductorFoto     = null,
     conductorVehiculo = 'Moto',
     precioAceptado    = params.precioPropuesto || 0,
     destDir           = 'Destino',
@@ -247,9 +248,13 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
 
         <View style={s.infoCard}>
           <View style={s.conductorRow}>
-            <View style={s.avatar}>
-              <Text style={s.avatarTxt}>{inicial}</Text>
-            </View>
+            {conductorFoto ? (
+              <Image source={{ uri: conductorFoto }} style={s.avatarFoto} />
+            ) : (
+              <View style={s.avatar}>
+                <Text style={s.avatarTxt}>{inicial}</Text>
+              </View>
+            )}
             <View style={s.conductorInfo}>
               <Text style={s.conductorNombre}>{conductorNombre}</Text>
               <Text style={s.conductorVehiculo}>{conductorVehiculo}</Text>
@@ -420,6 +425,13 @@ const s = StyleSheet.create({
     marginRight:     10,
   },
   avatarTxt:         { color: C.black, fontSize: 18, fontWeight: '800' },
+  avatarFoto: {
+    width:           44,
+    height:          44,
+    borderRadius:    22,
+    marginRight:     10,
+    backgroundColor: C.border,
+  },
   conductorInfo:     { flex: 1 },
   conductorNombre:   { color: C.black, fontSize: 15, fontWeight: '700', marginBottom: 2 },
   conductorVehiculo: { color: C.gray, fontSize: 12 },

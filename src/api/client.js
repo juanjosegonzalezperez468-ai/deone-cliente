@@ -121,4 +121,29 @@ export const chatApi = {
     api.post(`/chat/${serviceId}/mensaje`, data),
 };
 
+// Rutas urbanas de reparto: el comercio contrata un conductor por horas
+// para entregar múltiples pedidos en un solo recorrido.
+export const rutasApi = {
+  cotizar:  (data)          => api.post('/rutas/cotizar', data),
+  crear:    (data)          => api.post('/rutas', data),
+  obtener:  (rutaId)        => api.get(`/rutas/${rutaId}`),
+  misRutas: (rol)           => api.get('/rutas/mis-rutas', { params: { rol } }),
+  cancelar: (rutaId, motivo) => api.post(`/rutas/${rutaId}/cancelar`, { motivo }),
+};
+
+// Saldo prepago del cliente: se usa como garantía para publicar rutas
+// (las multas de cancelación se descuentan de aquí).
+export const billingApi = {
+  saldo:            (userId) => api.get(`/billing/saldo/${userId}`),
+  solicitarRecarga: (monto)  => api.post('/billing/solicitar-recarga', { monto }),
+};
+
+// Conductores disponibles cerca (para "X conductores cerca" al buscar)
+export const cercanosApi = {
+  conductores: (lat, lng, tipoServicio, radioKm = 5) =>
+    api.get('/locations/conductores/cercanos', {
+      params: { lat, lng, tipo_servicio: tipoServicio, radio_km: radioKm },
+    }),
+};
+
 export default api;

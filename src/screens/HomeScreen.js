@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
-  Dimensions, Image,
+  Dimensions, Image, Animated,
 } from 'react-native';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from 'expo-location';
@@ -26,6 +26,7 @@ const C = {
 
 const { width: SW } = Dimensions.get('window');
 const CARD_W = Math.floor((SW - 40 - 24) / 2);
+const DRAWER_W = SW * 0.8;
 
 const fmtCOP = (n) =>
   Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -64,6 +65,16 @@ const placesStyles = {
   poweredContainer: { backgroundColor: C.white },
   powered:          {},
 };
+
+function DrawerItem({ icon, label, onPress }) {
+  return (
+    <TouchableOpacity style={s.drawerItem} onPress={onPress} activeOpacity={0.7}>
+      <Text style={s.drawerItemIcon}>{icon}</Text>
+      <Text style={s.drawerItemLabel}>{label}</Text>
+      <Text style={s.drawerItemArrow}>›</Text>
+    </TouchableOpacity>
+  );
+}
 
 function ServiceCard({ service, selected, onPress, cardWidth }) {
   return (
@@ -123,6 +134,20 @@ export default function HomeScreen({ navigate }) {
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [perfil,           setPerfil]           = useState(null);
   const [subiendoFoto,     setSubiendoFoto]     = useState(false);
+  const [drawerOpen,       setDrawerOpen]       = useState(false);
+  const drawerAnim = useRef(new Animated.Value(-DRAWER_W)).current;
+
+  const abrirDrawer = () => {
+    setDrawerOpen(true);
+    Animated.timing(drawerAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start();
+  };
+
+  const cerrarDrawer = (cb) => {
+    Animated.timing(drawerAnim, { toValue: -DRAWER_W, duration: 200, useNativeDriver: true })
+      .start(() => { setDrawerOpen(false); if (cb) cb(); });
+  };
+
+  const irA = (pantalla) => cerrarDrawer(() => navigate(pantalla));
 
   useEffect(() => {
     getUserUuid().then(id => { if (id) uuidRef.current = id; });
@@ -334,6 +359,11 @@ export default function HomeScreen({ navigate }) {
       >
         {/* Header */}
         <View style={s.header}>
+          <TouchableOpacity style={s.menuBtn} onPress={abrirDrawer} activeOpacity={0.7}>
+            <View style={s.menuBar} />
+            <View style={s.menuBar} />
+            <View style={s.menuBar} />
+          </TouchableOpacity>
           <Image
             source={require('../../assets/logo.png')}
             style={s.logo}
@@ -421,6 +451,28 @@ export default function HomeScreen({ navigate }) {
             />
           </View>
         )}
+
+        {/* Sexto servicio: rutas urbanas de reparto */}
+        <TouchableOpacity
+          style={s.rutasCard}
+          onPress={() => navigate('CrearRuta')}
+          activeOpacity={0.85}
+        >
+          <View style={s.rutasCardLeft}>
+            <View style={s.rutasIconWrap}>
+              <Text style={s.rutasIcon}>📦</Text>
+            </View>
+            <View style={s.rutasTexts}>
+              <Text style={s.rutasTitle}>Entregas múltiples</Text>
+              <Text style={s.rutasDesc}>
+                ¿Tienes varios pedidos para entregar? Agrupa todas tus entregas en un solo recorrido.
+              </Text>
+            </View>
+          </View>
+          <View style={s.rutasBtn}>
+            <Text style={s.rutasBtnTxt}>Crear ruta</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Tarifa calculada */}
         {showFareArea && (
@@ -615,6 +667,37 @@ export default function HomeScreen({ navigate }) {
         </ScrollView>
       )}
 
+      {/* Menú lateral (drawer) */}
+      {drawerOpen && (
+        <>
+          <TouchableOpacity
+            style={s.drawerDim}
+            onPress={() => cerrarDrawer()}
+            activeOpacity={1}
+          />
+          <Animated.View style={[s.drawerPanel, { transform: [{ translateX: drawerAnim }] }]}>
+            <View style={s.drawerPerfil}>
+              <View style={s.drawerAvatar}>
+                <Text style={s.drawerAvatarTxt}>
+                  {(perfil?.nombre || 'U').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={s.drawerNombre} numberOfLines={1}>
+                {perfil?.nombre || 'Usuario'}
+              </Text>
+              <Text style={s.drawerSub}>Cliente Deone</Text>
+            </View>
+
+            <View style={s.drawerSep} />
+
+            <DrawerItem icon="🏠" label="Inicio"             onPress={() => cerrarDrawer()} />
+            <DrawerItem icon="📦" label="Rutas de entregas"  onPress={() => irA('MisRutas')} />
+            <DrawerItem icon="➕" label="Crear ruta"          onPress={() => irA('CrearRuta')} />
+            <DrawerItem icon="💳" label="Recargar saldo"      onPress={() => irA('RecargaSaldo')} />
+          </Animated.View>
+        </>
+      )}
+
       {/* Barra de navegación inferior */}
       <View style={s.bottomNav}>
         <TouchableOpacity style={s.navItem} onPress={() => setActiveTab('home')} activeOpacity={0.7}>
@@ -650,6 +733,78 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   logo:   { height: 32, width: 120 },
   city:   { color: C.grayLight, fontSize: 13, fontWeight: '500' },
+  menuBtn: { paddingVertical: 8, paddingRight: 12, justifyContent: 'center' },
+  menuBar: { width: 22, height: 2.5, backgroundColor: C.black, borderRadius: 2, marginVertical: 2.5 },
+
+  /* Card rutas de reparto (sexto servicio) */
+  rutasCard: {
+    backgroundColor: C.black,
+    borderRadius:    22,
+    padding:         16,
+    marginTop:       14,
+    marginHorizontal: 6,
+  },
+  rutasCardLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  rutasIconWrap: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: C.yellow,
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 12,
+  },
+  rutasIcon:   { fontSize: 22 },
+  rutasTexts:  { flex: 1 },
+  rutasTitle:  { color: C.white, fontSize: 16, fontWeight: '800', marginBottom: 3 },
+  rutasDesc:   { color: '#BBBBBB', fontSize: 12, lineHeight: 17 },
+  rutasBtn: {
+    backgroundColor: C.yellow,
+    borderRadius:    14,
+    paddingVertical: 12,
+    alignItems:      'center',
+  },
+  rutasBtnTxt: { color: C.black, fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+
+  /* Drawer */
+  drawerDim: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.50)',
+    zIndex: 50,
+  },
+  drawerPanel: {
+    position:        'absolute',
+    top:             0,
+    left:            0,
+    bottom:          0,
+    width:           DRAWER_W,
+    backgroundColor: C.white,
+    zIndex:          60,
+    paddingTop:      60,
+    shadowColor:     '#000',
+    shadowOffset:    { width: 6, height: 0 },
+    shadowOpacity:   0.15,
+    shadowRadius:    16,
+    elevation:       20,
+  },
+  drawerPerfil: { paddingHorizontal: 24, paddingBottom: 24 },
+  drawerAvatar: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: C.yellow,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  drawerAvatarTxt: { color: C.black, fontSize: 28, fontWeight: '900' },
+  drawerNombre:    { color: C.black, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  drawerSub:       { color: C.grayLight, fontSize: 13 },
+  drawerSep:       { height: 1, backgroundColor: C.grayBorder, marginHorizontal: 16, marginBottom: 8 },
+  drawerItem: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    paddingHorizontal: 24,
+    paddingVertical:   17,
+  },
+  drawerItemIcon:  { fontSize: 21, marginRight: 16, width: 30, textAlign: 'center' },
+  drawerItemLabel: { flex: 1, color: C.black, fontSize: 16, fontWeight: '600' },
+  drawerItemArrow: { color: C.grayLight, fontSize: 22, fontWeight: '300' },
 
   heading:  { color: C.black, fontSize: 30, fontWeight: '800', marginBottom: 4, letterSpacing: -0.5 },
   subtitle: { color: C.grayLight, fontSize: 13, marginBottom: 20 },

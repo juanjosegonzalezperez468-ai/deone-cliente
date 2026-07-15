@@ -14,6 +14,12 @@ import ViajeEnCursoScreen       from './src/screens/ViajeEnCursoScreen';
 import ServicioFinalizadoScreen from './src/screens/ServicioFinalizadoScreen';
 import ChatScreen               from './src/screens/ChatScreen';
 import TerminosScreen           from './src/screens/TerminosScreen';
+import CrearRutaScreen          from './src/screens/CrearRutaScreen';
+import BuscandoRutaScreen       from './src/screens/BuscandoRutaScreen';
+import RutaEnCursoScreen        from './src/screens/RutaEnCursoScreen';
+import RutaFinalizadaScreen     from './src/screens/RutaFinalizadaScreen';
+import MisRutasScreen           from './src/screens/MisRutasScreen';
+import RecargaSaldoScreen       from './src/screens/RecargaSaldoScreen';
 import ErrorBoundary            from './src/components/ErrorBoundary';
 
 Notifications.setNotificationHandler({
@@ -60,6 +66,19 @@ function Router() {
   useEffect(() => {
     const handleResponse = (response) => {
       const data = response?.notification?.request?.content?.data || {};
+      // Notificaciones de rutas de reparto
+      if (data.ruta_id) {
+        if (data.screen === 'RutaEnCurso') {
+          navigate('RutaEnCurso', { rutaId: data.ruta_id });
+        } else if (data.screen === 'RutaFinalizada') {
+          navigate('RutaFinalizada', { rutaId: data.ruta_id });
+        } else if (data.screen === 'Chat') {
+          navigate('Chat', { serviceDbId: data.ruta_id });
+        } else {
+          navigate('MisRutas');
+        }
+        return;
+      }
       if (!data.service_id) return;
       if (data.screen === 'Chat') {
         navigate('Chat', { serviceDbId: data.service_id });
@@ -88,6 +107,12 @@ function Router() {
   if (screen === 'ServicioFinalizado')return <ServicioFinalizadoScreen  params={params} goBack={goBack} />;
   if (screen === 'Chat')              return <ChatScreen                 params={params} goBack={goBack} />;
   if (screen === 'Terminos')          return <TerminosScreen             navigate={navigate} />;
+  if (screen === 'CrearRuta')         return <CrearRutaScreen            params={params} navigate={navigate} goBack={goBack} />;
+  if (screen === 'BuscandoRuta')      return <BuscandoRutaScreen         params={params} navigate={navigate} goBack={goBack} />;
+  if (screen === 'RutaEnCurso')       return <RutaEnCursoScreen          params={params} navigate={navigate} goBack={goBack} />;
+  if (screen === 'RutaFinalizada')    return <RutaFinalizadaScreen       params={params} goBack={goBack} />;
+  if (screen === 'MisRutas')          return <MisRutasScreen             navigate={navigate} goBack={goBack} />;
+  if (screen === 'RecargaSaldo')      return <RecargaSaldoScreen         goBack={goBack} />;
   if (screen === 'Home')              return <HomeScreen               navigate={navigate} />;
   return <SplashScreen navigate={navigate} />;
 }

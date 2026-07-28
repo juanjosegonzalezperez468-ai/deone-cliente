@@ -104,7 +104,7 @@ export default function TerminosScreen({ navigate }) {
         <Text style={s.parrafo}>
           Conservamos tus datos mientras mantengas una cuenta activa en DEONE. Puedes
           solicitar la eliminación de tu cuenta y sus datos asociados escribiendo a
-          soporte@deone.co. Procederemos a la eliminación dentro de los 15 días hábiles
+          juanjosegonzalezperez468@gmail.com. Procederemos a la eliminación dentro de los 15 días hábiles
           siguientes a la solicitud.
         </Text>
 
@@ -141,7 +141,7 @@ export default function TerminosScreen({ navigate }) {
         <Text style={s.titulo2}>8. CONTACTO</Text>
         <Text style={s.parrafo}>
           Para cualquier consulta sobre privacidad o datos personales escríbenos a:{'\n'}
-          soporte@deone.co
+          juanjosegonzalezperez468@gmail.com
         </Text>
 
         <View style={s.finalMarker}>

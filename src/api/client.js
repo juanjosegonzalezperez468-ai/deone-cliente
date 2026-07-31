@@ -74,6 +74,7 @@ export const authApi = {
       ...(nombre ? { nombre } : {}),
     }),
   perfil: (uid) => api.get(`/auth/perfil/${uid}`),
+  eliminarCuenta: (uid) => api.delete(`/auth/cuenta/${uid}`),
   subirFotoPerfil: (uid, formData) =>
     api.post(`/auth/perfil/${uid}/foto`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

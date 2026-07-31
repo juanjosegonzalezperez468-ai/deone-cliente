@@ -7,6 +7,7 @@ import ChatScreen from './ChatScreen';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { servicesApi } from '../api/client';
+import { solicitarUbicacionConAviso } from '../utils/locationDisclosure';
 
 const C = {
   bg:     '#F8F8F8',
@@ -50,7 +51,7 @@ export default function ViajeEnCursoScreen({ params, navigate, goBack }) {
   // Obtain GPS position once
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await solicitarUbicacionConAviso();
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const pos = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };

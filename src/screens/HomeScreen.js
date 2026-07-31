@@ -13,6 +13,7 @@ import { isNegotiable, calcFare, getDirections } from '../utils/fare';
 import auth from '@react-native-firebase/auth';
 import { servicesApi, authApi } from '../api/client';
 import { getUserUuid, clearBackendToken, clearPhone, clearUserUuid } from '../utils/tokenStorage';
+import { solicitarUbicacionConAviso } from '../utils/locationDisclosure';
 
 const C = {
   white:      '#FFFFFF',
@@ -156,7 +157,7 @@ export default function HomeScreen({ navigate }) {
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await solicitarUbicacionConAviso();
         if (status !== 'granted') return;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setDeviceLoc(loc.coords);
@@ -270,6 +271,51 @@ export default function HomeScreen({ navigate }) {
     navigate('Login');
   };
 
+  // Exigido por Google Play: la app debe ofrecer eliminar la cuenta y sus
+  // datos desde dentro. Doble confirmación porque es irreversible.
+  const handleEliminarCuenta = () => {
+    Alert.alert(
+      'Eliminar cuenta',
+      'Se borrarán tu acceso y tus datos personales de forma permanente. ' +
+        'El historial de viajes se conserva de forma anónima por razones ' +
+        'contables.\n\nEsta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Continuar',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              '¿Eliminar definitivamente?',
+              'Confirma que quieres eliminar tu cuenta de Deone.',
+              [
+                { text: 'No, conservar mi cuenta', style: 'cancel' },
+                {
+                  text: 'Sí, eliminar',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await authApi.eliminarCuenta(uuidRef.current);
+                    } catch (err) {
+                      const msg = err?.response?.data?.detail ||
+                        'No se pudo eliminar la cuenta. Intenta de nuevo más tarde.';
+                      Alert.alert('Error', msg);
+                      return;
+                    }
+                    await Promise.all([clearBackendToken(), clearPhone(), clearUserUuid()]);
+                    try { await auth().signOut(); } catch {}
+                    Alert.alert('Cuenta eliminada', 'Tu cuenta y tus datos personales fueron eliminados.');
+                    navigate('Login');
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   useEffect(() => {
     if (!origin.lat || !dest.lat || !selected) {
       setFareInfo(null);
@@ -311,7 +357,7 @@ export default function HomeScreen({ navigate }) {
   const handleGps = async () => {
     setGpsLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await solicitarUbicacionConAviso({ reintentar: true });
       if (status !== 'granted') {
         Alert.alert('Permiso denegado', 'Activa los permisos de ubicación en Configuración.');
         return;
@@ -664,6 +710,10 @@ export default function HomeScreen({ navigate }) {
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
             <Text style={s.logoutTxt}>CERRAR SESIÓN</Text>
           </TouchableOpacity>
+          {/* Eliminar cuenta (requisito de Google Play) */}
+          <TouchableOpacity style={s.deleteBtn} onPress={handleEliminarCuenta} activeOpacity={0.8}>
+            <Text style={s.deleteTxt}>Eliminar mi cuenta</Text>
+          </TouchableOpacity>
         </ScrollView>
       )}
 
@@ -992,4 +1042,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   logoutTxt: { color: '#FF3B30', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+
+  deleteBtn: {
+    marginTop: 14,
+    marginBottom: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  deleteTxt: { color: C.grayLight, fontSize: 13, textDecorationLine: 'underline' },
 });

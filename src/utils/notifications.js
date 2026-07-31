@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { authApi } from '../api/client';
+import { solicitarNotificacionesConAviso } from './notificationDisclosure';
 
 export async function registrarNotificacionesPush(uuid) {
   if (!uuid) return;
@@ -14,12 +15,7 @@ export async function registrarNotificacionesPush(uuid) {
       });
     }
 
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    let finalStatus = existing;
-    if (existing !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
+    const { status: finalStatus } = await solicitarNotificacionesConAviso();
     if (finalStatus !== 'granted') return;
 
     const { data: token } = await Notifications.getDevicePushTokenAsync();

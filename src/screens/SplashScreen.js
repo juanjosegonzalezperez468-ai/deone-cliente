@@ -6,7 +6,25 @@ import { API_URL } from '../constants/config';
 import { getBackendToken, storeBackendToken, getPhone, getUserUuid, storeUserUuid } from '../utils/tokenStorage';
 import { registrarNotificacionesPush } from '../utils/notifications';
 
-const ACTIVE_STATES = ['confirmado', 'en_camino', 'en_servicio'];
+// Estados en los que el cliente tiene algo en curso y hay que devolverlo a la
+// pantalla correspondiente al reabrir la app.
+//
+// 'pendiente' y 'negociando' son tan activos como el resto: el cliente ya pidió
+// el servicio y está esperando. Si no se contemplan, al reabrir la app aparece
+// la pantalla de pedir un servicio nuevo mientras la solicitud sigue viva en el
+// backend, sin forma de cancelarla desde ningún sitio.
+const ACTIVE_STATES = ['pendiente', 'negociando', 'confirmado', 'en_camino', 'en_servicio'];
+
+// A qué pantalla vuelve cada estado. 'negociando' también va a Waiting: esa
+// pantalla ya consulta las ofertas en su primer ciclo y salta sola a 'Ofertas',
+// así que no hace falta duplicar aquí esa lógica.
+const PANTALLA_POR_ESTADO = {
+  pendiente:   'Waiting',
+  negociando:  'Waiting',
+  confirmado:  'ConductorEnCamino',
+  en_camino:   'ConductorEnCamino',
+  en_servicio: 'ViajeEnCurso',
+};
 
 async function checkActiveTrip(uuid, jwt) {
   try {
@@ -58,12 +76,13 @@ export default function SplashScreen({ navigate }) {
 
         const activeTrip = await checkActiveTrip(uuid, jwt);
         if (activeTrip) {
-          const screen =
-            activeTrip.estado === 'confirmado' ? 'ConductorEnCamino' :
-            activeTrip.estado === 'en_camino'  ? 'ConductorEnCamino' :
-            'ViajeEnCurso';
-          navigate(screen, {
+          navigate(PANTALLA_POR_ESTADO[activeTrip.estado] || 'ViajeEnCurso', {
             serviceDbId:       activeTrip.id,
+            // WaitingScreen los necesita: 'serviceId' para pintar el icono y el
+            // nombre del servicio, 'precioPropuesto' para el resumen y para
+            // pasárselo a la pantalla siguiente cuando aparezca conductor.
+            serviceId:         activeTrip.tipo_servicio,
+            precioPropuesto:   activeTrip.precio_propuesto,
             conductorId:       activeTrip.conductor_id || '',
             conductorNombre:   'Conductor',
             conductorVehiculo: activeTrip.tipo_servicio,

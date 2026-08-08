@@ -3,8 +3,9 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Animated, Image, Alert, BackHandler,
 } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { SERVICES } from '../constants/services';
-import { offersApi, servicesApi } from '../api/client';
+import { offersApi, servicesApi, cercanosApi } from '../api/client';
 
 const C = {
   white: '#FFFFFF',
@@ -23,10 +24,43 @@ const SHADOW = {
   elevation: 3,
 };
 
+// Las posiciones se muestran desplazadas unos cientos de metros. Dos razones:
+// la exacta permitiría deducir dónde vive o para un conductor, y una moto
+// pintada en una esquina concreta promete algo que no podemos garantizar
+// —ese conductor puede estar ocupado o no querer el viaje—. Lo honesto es
+// mostrar que hay movimiento en la zona, no señalar personas.
+const DESVIO_GRADOS = 0.0035;   // ~350 m
+
+// Determinista a partir del id: el mismo conductor no salta de sitio entre
+// refrescos, que se vería como si se estuviera moviendo sin hacerlo.
+const difuminar = (lat, lng, semilla) => {
+  let h = 0;
+  for (let i = 0; i < semilla.length; i++) h = (h * 31 + semilla.charCodeAt(i)) | 0;
+  const a = (h % 360) * (Math.PI / 180);
+  const r = ((Math.abs(h >> 9) % 100) / 100) * DESVIO_GRADOS;
+  return { latitude: lat + Math.sin(a) * r, longitude: lng + Math.cos(a) * r };
+};
+
 export default function WaitingScreen({ params, navigate, goBack }) {
-  const { serviceId, serviceDbId, precioPropuesto } = params;
+  const { serviceId, serviceDbId, precioPropuesto, origenLat, origenLng } = params;
   const service = SERVICES.find((srv) => srv.id === serviceId);
   const [cancelando, setCancelando] = useState(false);
+  const [cerca, setCerca] = useState(null);   // null = aún no se sabe
+
+  // Conductores conectados en la zona. El endpoint ya descarta a quien lleve
+  // más de 10 min sin enviar ubicación, así que el dato es honesto.
+  useEffect(() => {
+    if (!origenLat || !origenLng) return;
+    let vivo = true;
+    const consultar = () => {
+      cercanosApi.conductores(origenLat, origenLng, serviceId, 5)
+        .then(({ data }) => { if (vivo) setCerca(data?.conductores || []); })
+        .catch(() => { if (vivo) setCerca([]); });
+    };
+    consultar();
+    const iv = setInterval(consultar, 20000);
+    return () => { vivo = false; clearInterval(iv); };
+  }, [origenLat, origenLng, serviceId]);
 
   const handleCancelar = async () => {
     if (cancelando) return;
@@ -177,6 +211,55 @@ export default function WaitingScreen({ params, navigate, goBack }) {
         <DotsLoader />
       </View>
 
+      {/* Mapa de la zona. Solo si tenemos origen: sin coordenadas no hay nada
+          honesto que pintar. */}
+      {origenLat && origenLng && (
+        <View style={[s.mapaCard, SHADOW]}>
+          <MapView
+            style={s.mapa}
+            initialRegion={{
+              latitude: origenLat, longitude: origenLng,
+              latitudeDelta: 0.02, longitudeDelta: 0.02,
+            }}
+            pointerEvents="none"
+            scrollEnabled={false}
+            zoomEnabled={false}
+            rotateEnabled={false}
+            pitchEnabled={false}
+            toolbarEnabled={false}
+          >
+            <Marker coordinate={{ latitude: origenLat, longitude: origenLng }} anchor={{ x: 0.5, y: 0.5 }}>
+              <View style={s.puntoYo}><View style={s.puntoYoDentro} /></View>
+            </Marker>
+
+            {(cerca || []).map((c) => (
+              <Marker
+                key={c.conductor_id}
+                coordinate={difuminar(Number(c.lat), Number(c.lng), String(c.conductor_id))}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+              >
+                <Text style={s.marcadorConductor}>{service ? service.icon : '🚗'}</Text>
+              </Marker>
+            ))}
+          </MapView>
+
+          <View style={s.mapaPie}>
+            <Text style={s.mapaTxt}>
+              {cerca === null ? 'Mirando tu zona…'
+                : cerca.length === 0
+                  ? 'Por ahora no hay conductores conectados cerca'
+                  : cerca.length === 1
+                    ? 'Hay 1 conductor conectado en tu zona'
+                    : `Hay ${cerca.length} conductores conectados en tu zona`}
+            </Text>
+            {!!(cerca || []).length && (
+              <Text style={s.mapaNota}>Ubicaciones aproximadas</Text>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Info card */}
       <View style={[s.infoCard, SHADOW]}>
         <Text style={s.infoLabel}>Estado</Text>
@@ -250,6 +333,26 @@ const s = StyleSheet.create({
 
   dotsRow: { flexDirection: 'row', gap: 8 },
   dot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: C.yellow },
+
+  /* Mapa de la zona */
+  mapaCard: {
+    marginHorizontal: 20, marginBottom: 14,
+    borderRadius: 18, overflow: 'hidden', backgroundColor: C.white,
+  },
+  mapa:    { height: 150, width: '100%' },
+  mapaPie: { paddingHorizontal: 14, paddingVertical: 11 },
+  mapaTxt: { fontSize: 13, fontWeight: '600', color: C.black },
+  mapaNota:{ fontSize: 10, color: C.grayLight, marginTop: 3 },
+  puntoYo: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(244,196,0,0.30)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  puntoYoDentro: {
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: C.yellow, borderWidth: 2, borderColor: C.white,
+  },
+  marcadorConductor: { fontSize: 20 },
 
   infoCard: {
     marginHorizontal: 24,

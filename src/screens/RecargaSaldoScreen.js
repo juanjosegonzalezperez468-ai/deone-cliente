@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { billingApi } from '../api/client';
 import { getUserUuid } from '../utils/tokenStorage';
+import { NEQUI_RECARGAS, WHATSAPP_SOPORTE, WHATSAPP_URL } from '../constants/config';
 
 const C = {
   white:      '#FFFFFF',
@@ -26,7 +27,6 @@ const SHADOW = {
 };
 
 const MONTOS = [10000, 20000, 50000, 100000];
-const WHATSAPP_SOPORTE = 'https://wa.me/573239420671';
 
 const fmtCOP = (n) => Number(n || 0).toLocaleString('es-CO');
 
@@ -110,11 +110,12 @@ export default function RecargaSaldoScreen({ goBack }) {
             <Text style={s.okTitle}>Solicitud enviada</Text>
             <Text style={s.okSub}>
               Tu recarga de ${fmtCOP(Number(monto))} quedó pendiente de aprobación.
-              Envía el comprobante de pago por WhatsApp para que el equipo Deone la apruebe.
+              Paga por Nequi al {NEQUI_RECARGAS} y envía el comprobante por WhatsApp
+              al {WHATSAPP_SOPORTE} para que el equipo Deone la apruebe.
             </Text>
             <TouchableOpacity
               style={s.waBtn}
-              onPress={() => Linking.openURL(WHATSAPP_SOPORTE).catch(() => {})}
+              onPress={() => Linking.openURL(WHATSAPP_URL).catch(() => {})}
               activeOpacity={0.85}
             >
               <Text style={s.waBtnTxt}>ENVIAR COMPROBANTE POR WHATSAPP</Text>
@@ -168,10 +169,25 @@ export default function RecargaSaldoScreen({ goBack }) {
               }
             </TouchableOpacity>
 
+            {/* El número del Nequi no aparecía por ningún lado: decía "paga
+                por Nequi" sin decir a quién. */}
+            <View style={s.nequiCard}>
+              <Text style={s.nequiLabel}>ENVÍA EL DINERO A ESTE NEQUI</Text>
+              <Text style={s.nequiNum}>{NEQUI_RECARGAS}</Text>
+              <Text style={s.nequiConcepto}>
+                Concepto: <Text style={{ fontWeight: '700' }}>DEONE + tu número</Text>
+              </Text>
+            </View>
+
             <Text style={s.pasos}>
               1. Solicita la recarga aquí.{'\n'}
-              2. Paga por Nequi o transferencia y envía el comprobante por WhatsApp.{'\n'}
-              3. El equipo Deone aprueba tu recarga y el saldo queda disponible.
+              2. Paga por Nequi al {NEQUI_RECARGAS}.{'\n'}
+              3. Envía el comprobante por WhatsApp al {WHATSAPP_SOPORTE}.{'\n'}
+              4. El equipo Deone aprueba tu recarga y el saldo queda disponible.
+            </Text>
+            <Text style={s.pasosNota}>
+              Son dos números distintos: el dinero va al Nequi y el comprobante
+              al WhatsApp.
             </Text>
           </>
         )}
@@ -258,6 +274,15 @@ const s = StyleSheet.create({
     alignItems:      'center',
   },
   solicitarBtnTxt: { color: C.black, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+
+  nequiCard: {
+    backgroundColor: C.yellowLight, borderRadius: 16, borderWidth: 1.5,
+    borderColor: C.yellow, padding: 16, alignItems: 'center', marginTop: 18,
+  },
+  nequiLabel:    { fontSize: 10, fontWeight: '800', color: C.grayLight, letterSpacing: 1 },
+  nequiNum:      { fontSize: 24, fontWeight: '800', color: C.black, marginTop: 6, letterSpacing: 1 },
+  nequiConcepto: { fontSize: 12, color: C.grayLight, marginTop: 8 },
+  pasosNota:     { fontSize: 11, color: C.grayLight, lineHeight: 16, marginTop: 8 },
 
   pasos: { color: C.grayLight, fontSize: 12, lineHeight: 20, marginTop: 18 },
 

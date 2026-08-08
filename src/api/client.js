@@ -86,6 +86,10 @@ export const authApi = {
 
 export const servicesApi = {
   crear:    (data)       => api.post('/services/crear', data),
+  // Reglas de tarifa y margen de negociación que exige el servidor. La app
+  // tiene sus propios valores por defecto: esto solo sirve para que un cambio
+  // de política no obligue a publicar una versión nueva.
+  configTarifas: ()      => api.get('/services/config-tarifas'),
   ofertas:  (serviceId)  => api.get(`/services/${serviceId}/ofertas`),
   obtener:  (serviceId)  => api.get(`/services/${serviceId}`),
   historial:(clienteId)  => api.get(`/services/cliente/${clienteId}`),

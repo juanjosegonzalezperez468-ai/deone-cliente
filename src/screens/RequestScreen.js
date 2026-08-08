@@ -33,6 +33,8 @@ const C = {
   grayLight: '#888888',
   grayBorder: '#EEEEEE',
   grayBg: '#F5F5F5',
+  green: '#22C55E',   // oferta por encima de la tarifa
+  red:   '#EF4444',   // oferta por debajo del mínimo
 };
 
 const SHADOW = {
@@ -56,6 +58,50 @@ export default function RequestScreen({ params, navigate, goBack }) {
   const [price, setPrice]     = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ─── Oferta del cliente sobre la tarifa sugerida ───
+  // La tarifa calculada deja de ser un precio impuesto y pasa a ser una
+  // sugerencia: el cliente ofrece lo que quiera por encima del piso. Es el
+  // modelo de inDrive, y encaja con lo que ya hacía el sistema (el conductor
+  // podía aceptar o contraofertar); lo que faltaba era dejar mover el precio.
+  const sugerido = negotiable ? 0 : Math.round(fareInfo.adjusted);
+
+  // Cuánto puede bajar. El servidor lo verifica por su cuenta con la distancia
+  // real; este valor solo pinta el mismo límite para no dejar enviar algo que
+  // vaya a ser rechazado. Se consulta al backend con este valor por defecto.
+  const [pisoRatio, setPisoRatio] = useState(0.85);
+  const piso = Math.round(sugerido * pisoRatio);
+
+  // Oferta actual como texto (permite borrar el campo mientras se escribe).
+  const [oferta, setOferta] = useState(String(sugerido));
+  const ofertaNum = parseInt(oferta, 10) || 0;
+
+  useEffect(() => {
+    let vivo = true;
+    servicesApi.configTarifas()
+      .then(({ data }) => {
+        if (vivo && typeof data?.piso_ratio === 'number') setPisoRatio(data.piso_ratio);
+      })
+      .catch(() => { /* se queda el valor por defecto; el servidor manda igual */ });
+    return () => { vivo = false; };
+  }, []);
+
+  // Desviación respecto al sugerido, para decirle al cliente qué esperar.
+  const desvio = sugerido > 0 ? Math.round(((ofertaNum - sugerido) / sugerido) * 100) : 0;
+  const bajoPiso = !negotiable && ofertaNum > 0 && ofertaNum < piso;
+
+  const pistaOferta =
+    bajoPiso                ? `El mínimo para este trayecto es $${fmtCOP(piso)}`
+    : desvio <= -10         ? 'Bastante por debajo: puede que tarden en tomarlo'
+    : desvio < 0            ? 'Algo por debajo de la tarifa'
+    : desvio === 0          ? 'Tarifa sugerida'
+    : desvio <= 15          ? 'Por encima: te lo tomarán más rápido'
+    :                         'Muy por encima de la tarifa';
+
+  const ajustar = (delta) => {
+    const nuevo = Math.max(piso, ofertaNum + delta);
+    setOferta(String(nuevo));
+  };
+
   // Contexto de grúa / acarreo
   const [gruaTipo, setGruaTipo]       = useState(null);
   const [gruaZona, setGruaZona]       = useState(null);
@@ -71,7 +117,9 @@ export default function RequestScreen({ params, navigate, goBack }) {
     esGrua    ? (gruaTipo && gruaZona) :
     esAcarreo ? !!acarreoTipo :
     true;
-  const precioOk = negotiable ? (price.length > 0 && parseInt(price, 10) > 0) : true;
+  const precioOk = negotiable
+    ? (price.length > 0 && parseInt(price, 10) > 0)
+    : (ofertaNum >= piso);
   const ready = detallesOk && precioOk;
 
   const subirTarjeta = async () => {
@@ -117,7 +165,9 @@ export default function RequestScreen({ params, navigate, goBack }) {
     if (!ready || loading) return;
     setLoading(true);
     try {
-      const precioPropuesto = negotiable ? parseInt(price, 10) : fareInfo.adjusted;
+      // En servicios con tarifa se envía lo que el cliente ofreció, no la
+      // tarifa calculada: la sugerencia es solo el punto de partida.
+      const precioPropuesto = negotiable ? parseInt(price, 10) : ofertaNum;
       const clienteId = await getUserUuid();
       if (!clienteId) {
         Alert.alert('Error', 'Debes iniciar sesión para solicitar un servicio.');
@@ -354,12 +404,47 @@ export default function RequestScreen({ params, navigate, goBack }) {
           </>
         ) : (
           <>
-            <Text style={s.section}>TARIFA ESTIMADA</Text>
-            <View style={[s.priceCard, SHADOW]}>
-              <Text style={s.currency}>$</Text>
-              <Text style={s.priceStatic}>{fmtCOP(fareInfo.adjusted)}</Text>
-              <Text style={s.cop}>COP</Text>
+            <Text style={s.section}>OFRECE TU PRECIO</Text>
+            <View style={[s.priceCard, SHADOW, bajoPiso && s.priceCardMal]}>
+              <TouchableOpacity
+                style={s.stepBtn}
+                onPress={() => ajustar(-500)}
+                disabled={ofertaNum <= piso}
+                activeOpacity={0.7}
+              >
+                <Text style={ofertaNum <= piso ? s.stepTxtOff : s.stepTxt}>−</Text>
+              </TouchableOpacity>
+
+              <View style={s.priceMid}>
+                <Text style={s.currency}>$</Text>
+                <TextInput
+                  style={s.priceInput}
+                  value={oferta}
+                  onChangeText={(v) => setOferta(v.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
+                  maxLength={7}
+                  selectTextOnFocus
+                />
+              </View>
+
+              <TouchableOpacity style={s.stepBtn} onPress={() => ajustar(500)} activeOpacity={0.7}>
+                <Text style={s.stepTxt}>+</Text>
+              </TouchableOpacity>
             </View>
+
+            <Text style={bajoPiso ? s.pistaMal : desvio > 0 ? s.pistaBien : s.pistaNeutra}>
+              {pistaOferta}
+              {!bajoPiso && desvio !== 0 && `  ·  ${desvio > 0 ? '+' : ''}${desvio}%`}
+            </Text>
+
+            {ofertaNum !== sugerido && !bajoPiso && (
+              <TouchableOpacity onPress={() => setOferta(String(sugerido))} activeOpacity={0.7}>
+                <Text style={s.volverSugerido}>
+                  Volver a la tarifa sugerida (${fmtCOP(sugerido)})
+                </Text>
+              </TouchableOpacity>
+            )}
+
             <View style={s.breakdownRow}>
               <View style={s.breakdownChip}>
                 <Text style={s.breakdownTxt}>{fareInfo.km.toFixed(1)} km</Text>
@@ -370,11 +455,11 @@ export default function RequestScreen({ params, navigate, goBack }) {
               </View>
               <View style={s.breakdownDot} />
               <View style={s.breakdownChip}>
-                <Text style={s.breakdownTxt}>base ${fmtCOP(fareInfo.base)}</Text>
+                <Text style={s.breakdownTxt}>sugerido ${fmtCOP(sugerido)}</Text>
               </View>
             </View>
             <Text style={s.priceHint}>
-              El conductor puede aceptar, rechazar o contraofertar esta tarifa.
+              El conductor puede aceptar tu precio o proponerte otro.
             </Text>
           </>
         )}
@@ -466,6 +551,24 @@ const s = StyleSheet.create({
   priceStatic: { flex: 1, color: C.black, fontSize: 36, fontWeight: '700' },
   cop:         { color: C.grayLight, fontSize: 14, fontWeight: '600', alignSelf: 'flex-end', marginBottom: 4 },
   priceHint:   { color: C.grayLight, fontSize: 12, marginBottom: 28, lineHeight: 18 },
+
+  /* Ofrece tu precio */
+  priceCardMal: { borderColor: C.red },
+  priceMid:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  stepBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.grayBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepTxt:    { fontSize: 26, fontWeight: '700', color: C.black, marginTop: -2 },
+  stepTxtOff: { fontSize: 26, fontWeight: '700', color: C.grayBorder, marginTop: -2 },
+  pistaNeutra: { color: C.grayLight, fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  pistaBien:   { color: C.green, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  pistaMal:    { color: C.red, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  volverSugerido: {
+    color: C.grayLight, fontSize: 12, fontWeight: '600',
+    textDecorationLine: 'underline', marginBottom: 10,
+  },
 
   breakdownRow: {
     flexDirection: 'row',

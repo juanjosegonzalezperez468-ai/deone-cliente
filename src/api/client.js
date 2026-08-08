@@ -84,6 +84,11 @@ export const authApi = {
   aceptarTerminos: (uid) => api.patch(`/auth/perfil/${uid}/terminos`),
 };
 
+export const soporteApi = {
+  miConversacion: ()    => api.get('/soporte/mi-conversacion'),
+  enviar:         (msg) => api.post('/soporte/mensaje', { mensaje: msg }),
+};
+
 export const servicesApi = {
   crear:    (data)       => api.post('/services/crear', data),
   // Reglas de tarifa y margen de negociación que exige el servidor. La app

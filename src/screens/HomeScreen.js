@@ -744,6 +744,7 @@ export default function HomeScreen({ navigate }) {
             <DrawerItem icon="📦" label="Rutas de entregas"  onPress={() => irA('MisRutas')} />
             <DrawerItem icon="➕" label="Crear ruta"          onPress={() => irA('CrearRuta')} />
             <DrawerItem icon="💳" label="Recargar saldo"      onPress={() => irA('RecargaSaldo')} />
+            <DrawerItem icon="💬" label="Soporte"             onPress={() => irA('Soporte')} />
           </Animated.View>
         </>
       )}

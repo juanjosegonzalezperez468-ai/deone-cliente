@@ -20,6 +20,7 @@ import RutaEnCursoScreen        from './src/screens/RutaEnCursoScreen';
 import RutaFinalizadaScreen     from './src/screens/RutaFinalizadaScreen';
 import MisRutasScreen           from './src/screens/MisRutasScreen';
 import RecargaSaldoScreen       from './src/screens/RecargaSaldoScreen';
+import SoporteScreen            from './src/screens/SoporteScreen';
 import ErrorBoundary            from './src/components/ErrorBoundary';
 
 Notifications.setNotificationHandler({
@@ -113,6 +114,7 @@ function Router() {
   if (screen === 'RutaFinalizada')    return <RutaFinalizadaScreen       params={params} goBack={goBack} />;
   if (screen === 'MisRutas')          return <MisRutasScreen             navigate={navigate} goBack={goBack} />;
   if (screen === 'RecargaSaldo')      return <RecargaSaldoScreen         goBack={goBack} />;
+  if (screen === 'Soporte')           return <SoporteScreen              onBack={goBack} />;
   if (screen === 'Home')              return <HomeScreen               navigate={navigate} />;
   return <SplashScreen navigate={navigate} />;
 }
